@@ -1,0 +1,1 @@
+https://www.aaabbb.de/WordList/WordList.php
