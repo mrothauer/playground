@@ -27,10 +27,23 @@
             background-color: #fff;
             border: 1px solid #ccc;
         }
+        form {
+            padding: 10px;
+            background-color: #fff;
+            border: 1px solid #ccc;
+            margin: 10px;
+        }
     </style>
 </head>
 <body>
     <h1>Primzahlen</h1>
+    <form type="GET">
+        <label for="niedrigsteZahl">Niedrigste Zahl:</label>
+        <input type="number" name="niedrigsteZahl" id="niedrigsteZahl">
+        <label for="hoechsteZahl">Höchste Zahl:</label>
+        <input type="number" name="hoechsteZahl" id="hoechsteZahl">
+        <button type="submit">Berechnen</button>
+    </form>
     <div id="output"></div>
     <script src="primzahlen.js"></script>
 </body>

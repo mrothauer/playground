@@ -1,5 +1,17 @@
-let niedrigsteZahl = 6000000;
-let hoechsteZahl   = 6005000;
+let urlParams = new URLSearchParams(window.location.search);
+let lowestNumber = urlParams.get('niedrigsteZahl');
+if (lowestNumber === null) {
+    lowestNumber = 30000;
+}
+let highestNumber = urlParams.get('hoechsteZahl');
+if (highestNumber === null) {
+    highestNumber = 50000;
+}
+let niedrigsteZahl = parseInt(lowestNumber);
+let hoechsteZahl = parseInt(highestNumber);
+
+document.getElementById('niedrigsteZahl').value = niedrigsteZahl;
+document.getElementById('hoechsteZahl').value = hoechsteZahl;
 
 let outputContainer = document.getElementById('output');
 
