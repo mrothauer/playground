@@ -22,16 +22,24 @@
             width: 100%;
             height: 100%;
             overflow: auto;
-            padding: 10px;
             box-sizing: border-box;
             background-color: #fff;
             border: 1px solid #ccc;
+        }
+        #word {
+            font-family: monospace;
+            font-size: 3.5em;
+            margin-top: 100px;
+            display: flex;
+            justify-content: center;
+
         }
     </style>
 </head>
 <body>
     <h1>Hangman</h1>
     <div id="output"></div>
+    <div id="word"></div>
     <script src="word_list_german.js"></script>
     <script src="hangman.js"></script>
 </body>
