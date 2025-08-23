@@ -1,6 +1,8 @@
-document.getElementById('inputText').addEventListener('keyup', function() {
+const inputText = document.getElementById('inputText');
+inputText.addEventListener('keyup', function() {
     translate(this.value);
 });
+inputText.dispatchEvent(new Event('keyup'));
 
 function translate(inputText) {
 
