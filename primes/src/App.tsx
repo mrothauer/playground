@@ -8,7 +8,7 @@ import './App.css'
 function getPrimesInRange(start: number, end: number): number[] {
   const min = Math.max(2, Math.min(start, end));
   const max = Math.max(start, end);
-  
+
   if (min > max) return [];
 
   // 1. Find all primes up to sqrt(max) using a simple sieve
@@ -16,7 +16,7 @@ function getPrimesInRange(start: number, end: number): number[] {
   const primesToLimit: number[] = [];
   const isPrimeSimple = new Array(limit + 1).fill(true);
   isPrimeSimple[0] = isPrimeSimple[1] = false;
-  
+
   for (let p = 2; p <= limit; p++) {
     if (isPrimeSimple[p]) {
       primesToLimit.push(p);
@@ -33,7 +33,7 @@ function getPrimesInRange(start: number, end: number): number[] {
     // Find the first multiple of p in the range [min, max]
     let startIdx = Math.ceil(min / p) * p;
     if (startIdx === p) startIdx += p; // Don't mark the prime itself as non-prime
-    
+
     for (let j = Math.max(startIdx, p * p); j <= max; j += p) {
       isPrimeRange[j - min] = false;
     }
@@ -61,20 +61,20 @@ function App() {
     const e_num = parseInt(end);
 
     if (isNaN(s) || isNaN(e_num)) {
-      setError('Please enter valid numbers!');
+      setError('Bitte gib gültige Zahlen ein!');
       setResults(null);
       return;
     }
 
     const rangeSize = Math.abs(s - e_num);
     if (rangeSize > 100000) {
-      setError('Whoa! That range is huge. Let\'s keep it under 100,000 for a speedy experience.');
+      setError('Hui! Dieser Bereich ist riesig. Lass uns unter 100.000 bleiben, damit es superschnell geht!');
       setResults(null);
       return;
     }
 
     if (Math.max(s, e_num) > 10000000) {
-       setError('Maximum number supported is 10,000,000 to keep your browser happy!');
+       setError('Die maximale Zahl ist 10.000.000, damit dein Browser fröhlich bleibt!');
        setResults(null);
        return;
     }
@@ -88,7 +88,7 @@ function App() {
         const foundPrimes = getPrimesInRange(s, e_num);
         setResults(foundPrimes);
       } catch (err) {
-        setError('Something went wrong during calculation. Try a smaller range.');
+        setError('Huch! Irgendwas ist schiefgelaufen. Versuche es mit einem kleineren Bereich.');
         console.error(err);
       } finally {
         setLoading(false);
@@ -99,46 +99,46 @@ function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1 className="title">Prime Explorer 🚀</h1>
-        <p className="subtitle">Discover the hidden primes in any range up to 100,000 numbers!</p>
+        <h1 className="title">Primzahlen-Suche 🚀</h1>
+        <p className="subtitle">Kannst du die magischen Primzahlen finden, die in der Galaxie versteckt sind?</p>
       </header>
 
       <form className="form" onSubmit={handleSubmit}>
         <div className="input-group">
           <div className="input-field">
-            <label htmlFor="start">From</label>
+            <label htmlFor="start">Start-Zone</label>
             <input
               id="start"
               type="number"
               value={start}
               onChange={(e) => setStart(e.target.value)}
-              placeholder="e.g. 1"
+              placeholder="1"
               disabled={loading}
             />
           </div>
           <div className="input-field">
-            <label htmlFor="end">To</label>
+            <label htmlFor="end">End-Zone</label>
             <input
               id="end"
               type="number"
               value={end}
               onChange={(e) => setEnd(e.target.value)}
-              placeholder="e.g. 100"
+              placeholder="100"
               disabled={loading}
             />
           </div>
         </div>
         <button type="submit" className={`submit-btn ${loading ? 'loading' : ''}`} disabled={loading}>
-          {loading ? 'Calculating...' : 'Reveal Primes!'}
+          {loading ? 'Weltraum-Scan...' : 'Suche starten! ⚡'}
         </button>
       </form>
 
-      {error && <div className="error-message">{error}</div>}
+      {error && <div className="error-message">🚀 Fehler: {error}</div>}
 
       {!loading && results !== null && (
         <div className="results-container">
           <h2 className="results-count">
-            Found {results.length.toLocaleString()} prime{results.length !== 1 ? 's' : ''}
+            {results.length.toLocaleString()} magische Primzahl{results.length !== 1 ? 'en' : ''} gefunden!
           </h2>
           <div className="results-grid">
             {results.slice(0, 2000).map((prime) => (
@@ -148,16 +148,16 @@ function App() {
             ))}
           </div>
           {results.length > 2000 && (
-            <p className="limit-notice">Showing the first 2,000 primes found. There are {results.length - 2000} more!</p>
+            <p className="limit-notice">Wahnsinn! Es gibt noch {results.length - 2000} weitere Primzahlen in den Tiefen des Alls!</p>
           )}
-          {results.length === 0 && <p className="no-results">No primes found in this range. Keep searching!</p>}
+          {results.length === 0 && <p className="no-results">Hier gibt es keine Primzahlen! Probiere einen anderen Sektor der Galaxie aus.</p>}
         </div>
       )}
 
       {loading && (
         <div className="loader-container">
           <div className="loader"></div>
-          <p>Sieving through numbers...</p>
+          <p>Das Universum wird nach Primzahlen abgesucht...</p>
         </div>
       )}
     </div>
