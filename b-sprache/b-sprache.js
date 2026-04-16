@@ -3,6 +3,7 @@ const charCount = document.getElementById('charCount');
 inputText.addEventListener('input', function() {
     translate(this.value);
     charCount.textContent = this.value.length;
+    document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 });
 
 inputText.addEventListener('focus', function() {
