@@ -1,8 +1,17 @@
 const inputText = document.getElementById('inputText');
-inputText.addEventListener('keyup', function() {
+const charCount = document.getElementById('charCount');
+inputText.addEventListener('input', function() {
     translate(this.value);
+    charCount.textContent = this.value.length;
 });
-inputText.dispatchEvent(new Event('keyup'));
+
+inputText.addEventListener('focus', function() {
+    this.select();
+});
+
+// Init
+charCount.textContent = inputText.value.length;
+translate(inputText.value);
 
 function translate(inputText) {
 
