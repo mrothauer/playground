@@ -17,7 +17,7 @@
         body, html {
             min-height: 100vh;
             font-family: 'Comic Neue', 'Comic Sans MS', cursive;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 30%, #f093fb 60%, #f5576c 100%);
+            background: linear-gradient(135deg, #ff0000 0%, #ff8800 14%, #ffff00 28%, #00cc00 42%, #0066ff 57%, #4400cc 71%, #8800ff 85%, #ff0000 100%);
             background-size: 400% 400%;
             animation: gradientShift 12s ease infinite;
             overflow-x: hidden;
@@ -246,6 +246,18 @@
         <div class="footer">Tippe einfach drauf los – die Übersetzung passiert sofort! 🚀</div>
     </div>
 
+    <script>
+    (function() {
+        const colors = ['#ff0000','#ff8800','#ffff00','#00cc00','#0066ff','#4400cc','#8800ff'];
+        for (let i = colors.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [colors[i], colors[j]] = [colors[j], colors[i]];
+        }
+        const stops = colors.map((c, i) => c + ' ' + Math.round(i / (colors.length - 1) * 100) + '%').join(', ');
+        document.body.style.background = 'linear-gradient(135deg, ' + stops + ')';
+        document.body.style.backgroundSize = '400% 400%';
+    })();
+    </script>
     <script src="b-sprache.js"></script>
 </body>
 </html>
