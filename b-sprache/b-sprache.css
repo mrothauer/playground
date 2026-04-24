@@ -67,6 +67,10 @@ h1 {
     font-size: 3em;
     font-weight: 800;
     text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: baseline;
+    gap: 8px;
     color: #fff;
     text-shadow:
         0 0 10px rgba(255, 255, 255, 0.5),
@@ -75,6 +79,79 @@ h1 {
     margin-bottom: 8px;
     animation: titleBounce 2s ease-in-out infinite;
     user-select: none;
+    position: relative;
+    z-index: 30;
+}
+
+.letter-picker {
+    position: relative;
+}
+
+.letter-picker > button {
+    border: 0;
+    background: rgba(255, 255, 255, 0.14);
+    color: inherit;
+    font: inherit;
+    font-size: 1em;
+    font-weight: 800;
+    line-height: 1;
+    padding: 0.05em 0.3em;
+    min-width: 1.2ch;
+    cursor: pointer;
+    text-align: center;
+    text-shadow: inherit;
+    border-radius: 8px;
+}
+
+.letter-picker > button:focus {
+    outline: 2px dashed rgba(255, 255, 255, 0.8);
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+
+.letter-grid {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 50%;
+    transform: translateX(-50%);
+    display: none;
+    grid-template-columns: repeat(5, minmax(32px, 1fr));
+    gap: 6px;
+    width: max-content;
+    max-width: min(90vw, 280px);
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.97);
+    border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
+    z-index: 20;
+}
+
+.letter-picker.is-open .letter-grid {
+    display: grid;
+}
+
+.letter-option {
+    border: 1px solid #d9c8f7;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 4px 0;
+    color: #1a1a2e;
+    font-family: 'Baloo 2', 'Comic Neue', cursive;
+    font-size: 16px;
+    font-weight: 700;
+    line-height: 1.1;
+    cursor: pointer;
+}
+
+.letter-option:hover,
+.letter-option:focus {
+    background: #f2e9ff;
+    outline: none;
+}
+
+.letter-option.is-active {
+    background: #e4d1ff;
+    border-color: #b58ff2;
 }
 
 @keyframes titleBounce {
@@ -196,6 +273,16 @@ textarea::placeholder {
 @media (max-width: 500px) {
     h1 { font-size: 1.6em; margin-bottom: 4px; }
     .subtitle { font-size: 0.9em; margin-bottom: 10px; }
+    h1 { gap: 4px; }
+    .letter-grid {
+        grid-template-columns: repeat(5, minmax(28px, 1fr));
+        gap: 4px;
+        padding: 8px;
+    }
+    .letter-option {
+        font-size: 14px;
+        padding: 3px 0;
+    }
     .container { padding: 8px 8px 20px; }
     .card { padding: 10px; border-radius: 14px; margin-bottom: 10px; }
     .card-label { font-size: 0.95em; margin-bottom: 6px; }

@@ -22,8 +22,37 @@
     </div>
 
     <div class="container">
-        <h1>🗣️ B-Sprache</h1>
-        <p class="subtitle">Der ultimative B-Sprache-Übübebersebetzeber! ✨</p>
+        <h1 id="languageTitle">🗣️
+            <span class="letter-picker" id="letterPicker">
+                <button type="button" id="mainLetterButton" aria-haspopup="listbox" aria-expanded="false" aria-label="Hauptbuchstabe auswählen">B</button>
+                <div class="letter-grid" id="letterGrid" role="listbox" aria-label="Hauptbuchstaben">
+                    <button type="button" class="letter-option is-active" data-letter="b" aria-selected="true">B</button>
+                    <button type="button" class="letter-option" data-letter="c" aria-selected="false">C</button>
+                    <button type="button" class="letter-option" data-letter="d" aria-selected="false">D</button>
+                    <button type="button" class="letter-option" data-letter="f" aria-selected="false">F</button>
+                    <button type="button" class="letter-option" data-letter="g" aria-selected="false">G</button>
+                    <button type="button" class="letter-option" data-letter="h" aria-selected="false">H</button>
+                    <button type="button" class="letter-option" data-letter="j" aria-selected="false">J</button>
+                    <button type="button" class="letter-option" data-letter="k" aria-selected="false">K</button>
+                    <button type="button" class="letter-option" data-letter="l" aria-selected="false">L</button>
+                    <button type="button" class="letter-option" data-letter="m" aria-selected="false">M</button>
+                    <button type="button" class="letter-option" data-letter="n" aria-selected="false">N</button>
+                    <button type="button" class="letter-option" data-letter="p" aria-selected="false">P</button>
+                    <button type="button" class="letter-option" data-letter="q" aria-selected="false">Q</button>
+                    <button type="button" class="letter-option" data-letter="r" aria-selected="false">R</button>
+                    <button type="button" class="letter-option" data-letter="s" aria-selected="false">S</button>
+                    <button type="button" class="letter-option" data-letter="t" aria-selected="false">T</button>
+                    <button type="button" class="letter-option" data-letter="v" aria-selected="false">V</button>
+                    <button type="button" class="letter-option" data-letter="w" aria-selected="false">W</button>
+                    <button type="button" class="letter-option" data-letter="x" aria-selected="false">X</button>
+                    <button type="button" class="letter-option" data-letter="y" aria-selected="false">Y</button>
+                    <button type="button" class="letter-option" data-letter="z" aria-selected="false">Z</button>
+                </div>
+                <input type="hidden" id="mainLetter" name="mainLetter" value="b">
+            </span>
+            <span id="languageSuffix">-Sprache</span>
+        </h1>
+        <p class="subtitle" id="languageSubtitle">Der ultimative B-Sprache-Übübebersebetzeber! ✨</p>
 
         <div class="card">
             <div class="card-label"><span class="icon">✏️</span> Dein Text</div>
@@ -32,7 +61,7 @@
         </div>
 
         <div class="card">
-            <div class="card-label"><span class="icon">🪄</span> In B-Sprache</div>
+            <div class="card-label" id="outputLabel"><span class="icon">🪄</span> In B-Sprache</div>
             <div id="output"></div>
         </div>
 
