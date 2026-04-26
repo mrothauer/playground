@@ -77,7 +77,7 @@ h1 {
         0 0 30px rgba(255, 255, 255, 0.3),
         3px 3px 0 rgba(0, 0, 0, 0.15);
     margin-bottom: 8px;
-    animation: titleBounce 2s ease-in-out infinite;
+    animation: none;
     user-select: none;
     position: relative;
     z-index: 30;
@@ -92,7 +92,7 @@ h1 {
     background: rgba(255, 255, 255, 0.14);
     color: inherit;
     font: inherit;
-    font-size: 1em;
+    font-size: 1.25em;
     font-weight: 800;
     line-height: 1;
     padding: 0.05em 0.3em;
@@ -115,11 +115,11 @@ h1 {
     left: 50%;
     transform: translateX(-50%);
     display: none;
-    grid-template-columns: repeat(5, minmax(32px, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(5, minmax(36px, 1fr));
+    gap: 8px;
     width: max-content;
-    max-width: min(90vw, 280px);
-    padding: 10px;
+    max-width: min(92vw, 320px);
+    padding: 12px;
     background: rgba(255, 255, 255, 0.97);
     border-radius: 12px;
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.22);
@@ -134,10 +134,10 @@ h1 {
     border: 1px solid #d9c8f7;
     background: #ffffff;
     border-radius: 8px;
-    padding: 4px 0;
+    padding: 6px 0;
     color: #1a1a2e;
     font-family: 'Baloo 2', 'Comic Neue', cursive;
-    font-size: 16px;
+    font-size: 21.25px;
     font-weight: 700;
     line-height: 1.1;
     cursor: pointer;
@@ -162,7 +162,7 @@ h1 {
 .subtitle {
     text-align: center;
     color: rgba(255, 255, 255, 0.9);
-    font-size: 1.1em;
+    font-size: 1.375em;
     margin-bottom: 24px;
     font-weight: 700;
     letter-spacing: 0.5px;
@@ -189,7 +189,7 @@ h1 {
 
 .card-label {
     font-family: 'Baloo 2', cursive;
-    font-size: 1.1em;
+    font-size: 1.375em;
     font-weight: 700;
     color: #764ba2;
     margin-bottom: 10px;
@@ -199,7 +199,7 @@ h1 {
 }
 
 .card-label .icon {
-    font-size: 1.3em;
+    font-size: 1em;
 }
 
 textarea {
@@ -209,7 +209,7 @@ textarea {
     border: 3px solid #e0d4f5;
     border-radius: 16px;
     font-family: 'Comic Neue', cursive;
-    font-size: 1.15em;
+    font-size: 1.4375em;
     line-height: 1.6;
     color: #333;
     background: #faf8ff;
@@ -228,7 +228,7 @@ textarea::placeholder {
 }
 
 #output {
-    font-size: 1.15em;
+    font-size: 1.4375em;
     line-height: 1.6;
     color: #1a1a2e;
     min-height: 60px;
@@ -250,7 +250,7 @@ textarea::placeholder {
 /* Character counter */
 .char-count {
     text-align: right;
-    font-size: 0.85em;
+    font-size: 1.0625em;
     color: #a78bfa;
     margin-top: 6px;
     font-weight: 700;
@@ -266,13 +266,13 @@ textarea::placeholder {
     text-align: center;
     margin-top: 16px;
     color: rgba(255, 255, 255, 0.7);
-    font-size: 0.85em;
+    font-size: 1.0625em;
 }
 
 /* Mobile tweaks */
 @media (max-width: 500px) {
     h1 { font-size: 1.6em; margin-bottom: 4px; }
-    .subtitle { font-size: 0.9em; margin-bottom: 10px; }
+    .subtitle { font-size: 1.125em; margin-bottom: 10px; }
     h1 { gap: 4px; }
     .letter-grid {
         grid-template-columns: repeat(5, minmax(28px, 1fr));
@@ -280,14 +280,14 @@ textarea::placeholder {
         padding: 8px;
     }
     .letter-option {
-        font-size: 14px;
+        font-size: 17.5px;
         padding: 3px 0;
     }
     .container { padding: 8px 8px 20px; }
     .card { padding: 10px; border-radius: 14px; margin-bottom: 10px; }
-    .card-label { font-size: 0.95em; margin-bottom: 6px; }
-    textarea { font-size: 0.95em; height: 70px; padding: 10px; border-radius: 10px; }
-    #output { font-size: 0.95em; min-height: 40px; padding: 10px; border-radius: 10px; }
+    .card-label { font-size: 1.1875em; margin-bottom: 6px; }
+    textarea { font-size: 1.1875em; height: 70px; padding: 10px; border-radius: 10px; }
+    #output { font-size: 1.1875em; min-height: 40px; padding: 10px; border-radius: 10px; }
     .char-count { display: none; }
     .footer { display: none; }
 }
