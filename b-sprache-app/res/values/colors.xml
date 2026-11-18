@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="header_start">#FF9EC7</color>
+    <color name="header_center">#C59BFF</color>
+    <color name="header_end">#8EC5FF</color>
+    <color name="bar_text">#FFFFFF</color>
+    <color name="background">#FBF6FF</color>
+    <color name="card">#FFFFFF</color>
+    <color name="border">#E3D4FF</color>
+    <color name="output_card">#FFF4FA</color>
+    <color name="output_border">#FFC9E1</color>
+    <color name="text">#2D2140</color>
+    <color name="output_text">#7A3FD1</color>
+    <color name="muted">#8A7AA8</color>
+    <color name="accent">#B05CFF</color>
+    <color name="button_copy">#FF7EB6</color>
+    <color name="button_share">#9B6BFF</color>
+    <color name="ripple">#55FFFFFF</color>
+    <color name="button_speak_start">#FFB86B</color>
+    <color name="button_speak_end">#FF7EB6</color>
+</resources>
