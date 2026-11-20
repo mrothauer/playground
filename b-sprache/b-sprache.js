@@ -46,6 +46,9 @@ inputText.addEventListener('focus', function() {
 });
 
 // Init
+if (/Android/i.test(navigator.userAgent)) {
+    document.getElementById('appLink').hidden = false;
+}
 charCount.textContent = inputText.value.length;
 setMainLetter(mainLetterInput.value);
 

@@ -269,6 +269,28 @@ textarea::placeholder {
     font-size: 1.0625em;
 }
 
+.app-link {
+    display: block;
+    width: max-content;
+    margin: 12px auto 0;
+    padding: 6px 14px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+    font-size: 0.9375em;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.app-link[hidden] {
+    display: none;
+}
+
+.app-link:hover,
+.app-link:focus {
+    background: rgba(255, 255, 255, 0.3);
+}
+
 /* Mobile tweaks */
 @media (max-width: 500px) {
     h1 { font-size: 1.6em; margin-bottom: 4px; }
