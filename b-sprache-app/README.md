@@ -8,7 +8,7 @@ live übersetzt (nach jedem Vokal kommt der Hauptbuchstabe + Vokal, Doppellaute 
 - 🔊 Vorlesen der Übersetzung (Android-Sprachausgabe, deutsche Stimme)
 - Kopieren, Teilen, Leeren, Zeichenzähler
 - Text aus anderen Apps per „Teilen → B-Sprache“ empfangen
-- Einhorn-Design mit Animationen, Dark Mode
+- Sprechendes „B“ als Maskottchen und App-Icon, mit Animationen, Dark Mode
 
 **APK:** `dist/b-sprache.apk` (Android 7.0+)
 

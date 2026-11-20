@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sprechender Buchstabe B, eigene Zeichnung. Viewport 120x120 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="120dp" android:height="120dp"
+    android:viewportWidth="120" android:viewportHeight="120">
+    <!-- Füßchen -->
+    <path android:fillColor="#5B3A99" android:pathData="M12,107 a10,5 0 1,0 20,0 a10,5 0 1,0 -20,0 z" />
+    <path android:fillColor="#5B3A99" android:pathData="M48,107 a10,5 0 1,0 20,0 a10,5 0 1,0 -20,0 z" />
+    <!-- Ärmchen (winkt) -->
+    <path android:strokeColor="#5B3A99" android:strokeWidth="4" android:strokeLineCap="round"
+        android:pathData="M9,62 Q3,56 6,47" />
+    <path android:fillColor="#FFCF5A" android:strokeColor="#5B3A99" android:strokeWidth="2"
+        android:pathData="M1.5,43 a4.5,4.5 0 1,0 9,0 a4.5,4.5 0 1,0 -9,0 z" />
+    <!-- Körper: das B -->
+    <path android:fillColor="#B05CFF" android:strokeColor="#5B3A99" android:strokeWidth="4"
+        android:strokeLineJoin="round"
+        android:pathData="M19,10 L50,10 C68,10 78,20 78,33 C78,43 73,49 67,53 C78,57 84,66 84,78 C84,95 72,104 53,104 L19,104 C13,104 9,100 9,94 L9,20 C9,14 13,10 19,10 Z" />
+    <!-- Glanz -->
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.5" android:strokeWidth="4"
+        android:strokeLineCap="round" android:pathData="M16,24 L16,44" />
+    <path android:strokeColor="#FFFFFF" android:strokeAlpha="0.5" android:strokeWidth="3"
+        android:strokeLineCap="round" android:pathData="M50,17 Q62,18 67,26" />
+    <!-- Augen -->
+    <path android:fillColor="#FFFFFF" android:strokeColor="#5B3A99" android:strokeWidth="2"
+        android:pathData="M23,33 a8,9 0 1,0 16,0 a8,9 0 1,0 -16,0 z M45,33 a8,9 0 1,0 16,0 a8,9 0 1,0 -16,0 z" />
+    <path android:fillColor="#2D2140"
+        android:pathData="M29,34 a4.5,5 0 1,0 9,0 a4.5,5 0 1,0 -9,0 z M51,34 a4.5,5 0 1,0 9,0 a4.5,5 0 1,0 -9,0 z" />
+    <path android:fillColor="#FFFFFF"
+        android:pathData="M32,31.5 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0 z M54,31.5 a1.8,1.8 0 1,0 3.6,0 a1.8,1.8 0 1,0 -3.6,0 z" />
+    <!-- Augenbrauen -->
+    <path android:strokeColor="#5B3A99" android:strokeWidth="2.5" android:strokeLineCap="round"
+        android:pathData="M25,20 Q31,17 36,20 M48,20 Q54,17 59,20" />
+    <!-- Bäckchen -->
+    <path android:fillColor="#FF7EB6" android:fillAlpha="0.75"
+        android:pathData="M15,62 a5.5,4 0 1,0 11,0 a5.5,4 0 1,0 -11,0 z M64,62 a5.5,4 0 1,0 11,0 a5.5,4 0 1,0 -11,0 z" />
+    <!-- Mund (offen, spricht) -->
+    <path android:fillColor="#3A1F5C" android:strokeColor="#5B3A99" android:strokeWidth="2"
+        android:strokeLineJoin="round"
+        android:pathData="M29,62 Q45,66 60,61 Q60,86 45,87 Q30,86 29,62 Z" />
+    <path android:fillColor="#FFFFFF" android:pathData="M33,63.2 Q45,66 56,62.6 L55.5,66.5 Q45,69 33.5,67 Z" />
+    <path android:fillColor="#FF7EB6" android:pathData="M36,81 Q45,73 54,81 Q50,87 45,87 Q39,87 36,81 Z" />
+    <!-- Schallwellen -->
+    <path android:strokeColor="#FF7EB6" android:strokeWidth="3.5" android:strokeLineCap="round"
+        android:pathData="M91,66 Q96,74 91,82" />
+    <path android:strokeColor="#8EC5FF" android:strokeWidth="3.5" android:strokeLineCap="round"
+        android:pathData="M99,60 Q107,74 99,88" />
+    <!-- Sprechblase -->
+    <path android:fillColor="#FFFFFF" android:strokeColor="#5B3A99" android:strokeWidth="2.5"
+        android:strokeLineJoin="round"
+        android:pathData="M91,6 L111,6 Q117,6 117,12 L117,30 Q117,36 111,36 L99,36 L86,45 L91,36 Q85,36 85,30 L85,12 Q85,6 91,6 Z" />
+    <path android:fillColor="#FF7EB6" android:pathData="M90.5,21 a2.8,2.8 0 1,0 5.6,0 a2.8,2.8 0 1,0 -5.6,0 z" />
+    <path android:fillColor="#B05CFF" android:pathData="M98.2,21 a2.8,2.8 0 1,0 5.6,0 a2.8,2.8 0 1,0 -5.6,0 z" />
+    <path android:fillColor="#8EC5FF" android:pathData="M105.9,21 a2.8,2.8 0 1,0 5.6,0 a2.8,2.8 0 1,0 -5.6,0 z" />
+</vector>

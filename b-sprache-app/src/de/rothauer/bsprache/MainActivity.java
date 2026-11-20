@@ -35,7 +35,7 @@ public class MainActivity extends Activity {
     private TextView subtitle;
     private TextView outputLabel;
     private TextView charCount;
-    private View unicorn;
+    private View talkingB;
     private long lastHop;
     private String mainLetter = "b";
     private Button speakButton;
@@ -54,8 +54,8 @@ public class MainActivity extends Activity {
         subtitle = findViewById(R.id.subtitle);
         outputLabel = findViewById(R.id.output_label);
         charCount = findViewById(R.id.char_count);
-        unicorn = findViewById(R.id.unicorn);
-        unicorn.setOnClickListener(v -> wiggle());
+        talkingB = findViewById(R.id.talkingB);
+        talkingB.setOnClickListener(v -> wiggle());
         letterView.setOnClickListener(v -> showLetterPicker());
 
         mainLetter = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_LETTER, "b");
@@ -244,21 +244,21 @@ public class MainActivity extends Activity {
     /** Kleiner Hüpfer beim Tippen (höchstens alle 400 ms). */
     private void hop() {
         long now = System.currentTimeMillis();
-        if (unicorn == null || now - lastHop < 400) return;
+        if (talkingB == null || now - lastHop < 400) return;
         lastHop = now;
         float h = -12 * getResources().getDisplayMetrics().density;
-        unicorn.animate().translationY(h).setDuration(120).withEndAction(() ->
-            unicorn.animate().translationY(0).setInterpolator(new OvershootInterpolator(3f)).setDuration(260).start()
+        talkingB.animate().translationY(h).setDuration(120).withEndAction(() ->
+            talkingB.animate().translationY(0).setInterpolator(new OvershootInterpolator(3f)).setDuration(260).start()
         ).start();
     }
 
-    /** Antippen: Einhorn wackelt mit dem Kopf. */
+    /** Antippen: das B wackelt hin und her. */
     private void wiggle() {
-        unicorn.animate().cancel();
-        unicorn.setRotation(0);
-        unicorn.animate().rotation(-14).setDuration(90).withEndAction(() ->
-            unicorn.animate().rotation(12).setDuration(140).withEndAction(() ->
-                unicorn.animate().rotation(0).setInterpolator(new OvershootInterpolator(4f)).setDuration(300).start()
+        talkingB.animate().cancel();
+        talkingB.setRotation(0);
+        talkingB.animate().rotation(-14).setDuration(90).withEndAction(() ->
+            talkingB.animate().rotation(12).setDuration(140).withEndAction(() ->
+                talkingB.animate().rotation(0).setInterpolator(new OvershootInterpolator(4f)).setDuration(300).start()
             ).start()
         ).start();
     }

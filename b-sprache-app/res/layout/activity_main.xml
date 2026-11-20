@@ -6,7 +6,7 @@
     android:fitsSystemWindows="true"
     android:background="@color/background">
 
-    <!-- Kopfbereich mit Regenbogen-Verlauf und Einhorn -->
+    <!-- Kopfbereich mit Regenbogen-Verlauf und sprechendem B -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -67,11 +67,11 @@
         </LinearLayout>
 
         <ImageView
-            android:id="@+id/unicorn"
+            android:id="@+id/talkingB"
             android:layout_width="104dp"
             android:layout_height="104dp"
-            android:contentDescription="@string/unicorn"
-            android:src="@drawable/unicorn" />
+            android:contentDescription="@string/talking_b"
+            android:src="@drawable/talking_b" />
     </LinearLayout>
 
     <ScrollView
