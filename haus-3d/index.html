@@ -96,7 +96,7 @@
 <div id="stage"></div>
 
 <section class="panel" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 20:10</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 20:35</small></h1>
   <button id="toggle" aria-label="Panel einklappen">–</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -1249,14 +1249,88 @@ function tiltPanel(x0, x1, y0, y1, dir, top, thick, material, shadow = true) {
   }
 }
 
-// zwei Bäume im eigenen Garten
-[[2300 + SITE_SHIFT_X, 700 + SITE_SHIFT_Y], [3200 + SITE_SHIFT_X, 1200 + SITE_SHIFT_Y]].forEach(([x, y], i) => {
-  const s = 0.9 + (i % 2) * 0.35;
-  const trunk = addMesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2 * s, 8), mat.wood, groups.site);
-  trunk.position.set(X(x), G + 1.1 * s, Z(y));
-  const crown = addMesh(new THREE.IcosahedronGeometry(1.6 * s, 1), M('#5f8045', { flatShading: true }), groups.site);
-  crown.position.set(X(x), G + 2.9 * s, Z(y));
-});
+/* Bodentrampolin Salta Premium Ground, rund, ohne Netz, Ø 366 cm, schwarz: in der linken hinteren
+   Gartenecke (vom Haus aus gesehen), Oberkante ca. 30 cm über dem Rasen. Lage aus dem Luftbild (Google Maps). */
+{
+  const cx = X(2860), cz = Z(-50), base = gw(cx), R = 1.83, pw = 0.33, top = 0.30;
+  const black = M('#1d1e20', { roughness: 0.85 }), pad = M('#26282b', { roughness: 0.7 });
+  // Seitenteil vom Rasen bis unter das Randpolster
+  const side = addMesh(new THREE.CylinderGeometry(R, R, top - 0.02, 72, 1, true), pad, groups.site);
+  side.position.set(cx, base + (top - 0.02) / 2, cz);
+  // Randpolster oben (Ring mit gerundeter Außenkante)
+  const ring = addMesh(new THREE.RingGeometry(R - pw, R, 72), pad, groups.site, { walk: true });
+  ring.rotation.x = -Math.PI / 2; ring.position.set(cx, base + top, cz);
+  const edge = addMesh(new THREE.TorusGeometry(R - 0.02, 0.025, 6, 72), pad, groups.site, { shadow: false });
+  edge.rotation.x = Math.PI / 2; edge.position.set(cx, base + top - 0.02, cz);
+  // Sprungtuch etwas tiefer als das Polster
+  const mat1 = addMesh(new THREE.CircleGeometry(R - pw + 0.01, 72), black, groups.site, { walk: true });
+  mat1.rotation.x = -Math.PI / 2; mat1.position.set(cx, base + top - 0.03, cz);
+  const col = addMesh(new THREE.CylinderGeometry(R, R, top, 24), mat.rail, groups.site, { collide: true, shadow: false });
+  col.position.set(cx, base + top / 2, cz); col.visible = false;
+}
+
+/* Pool im Garten: Aufstellpool (Stahlwand), blau, ca. 1 m hoch, eiförmig: ca. 4,0 m lang,
+   schmales Ende (Ø ca. 1,7 m) zum Haus, breites Ende (Ø ca. 2,5 m) zum Garten.
+   Lage aus dem Luftbild (Google Maps): neben dem Holzzaun zum westlichen Nachbarn, ca. 23 m hinter
+   der Hausfront zur Straße; die Längsachse läuft parallel zum Zaun (Plan-x). */
+{
+  const cx = X(2260), cz = Z(1170), H = 1.0, base = gw(cx), t = 0.03;
+  const r1 = 0.85, r2 = 1.25, len = 4.0, d = len - r1 - r2;          // schmaler / breiter Kreis, Abstand der Mittelpunkte
+  const c1 = -len / 2 + r1, c2 = c1 + d;                               // Mittelpunkte entlang der Längsachse (lokal x)
+  const al = Math.acos((r2 - r1) / d);                                 // Winkel der Tangenten zwischen den Kreisen
+  // Ei-Umriss: großer Bogen am breiten Ende, Tangenten, kleiner Bogen am schmalen Ende; off = nach innen versetzt
+  const egg = (off = 0, hole = false) => {
+    const a = r1 - off, b = r2 - off, s = hole ? new THREE.Path() : new THREE.Shape();
+    s.moveTo(c2 + b * Math.cos(-al), b * Math.sin(-al));
+    s.absarc(c2, 0, b, -al, al, false);
+    s.lineTo(c1 + a * Math.cos(al), a * Math.sin(al));
+    s.absarc(c1, 0, a, al, Math.PI * 2 - al, false);
+    s.closePath();
+    return s;
+  };
+  const ring = (outer, th) => { const sh = egg(-outer); sh.holes.push(egg(th - outer, true)); return sh; };
+  const pool = new THREE.Group(); pool.position.set(cx, base, cz); groups.site.add(pool);
+  const add = (geo, material, opts = {}) => { const m = new THREE.Mesh(geo, material); m.castShadow = opts.shadow !== false; m.receiveShadow = true; pool.add(m); return m; };
+  const up = g => { g.rotateX(-Math.PI / 2); return g; };
+  add(up(new THREE.ExtrudeGeometry(ring(0, t), { depth: H, bevelEnabled: false, curveSegments: 48 })), M('#2f6fb3', { roughness: 0.5, metalness: 0.2 }));
+  // Handlauf oben, etwas breiter als die Wand
+  add(up(new THREE.ExtrudeGeometry(ring(0.03, 0.12), { depth: 0.03, bevelEnabled: false, curveSegments: 48 })), M('#e9ecee', { roughness: 0.4 })).position.y = H;
+  add(up(new THREE.ShapeGeometry(egg(t), 48)), M('#8cc4e3', { roughness: 0.7 }), { shadow: false }).position.y = 0.01;
+  const water = add(up(new THREE.ShapeGeometry(egg(t), 48)),
+    new THREE.MeshStandardMaterial({ color: '#3fa9d6', transparent: true, opacity: 0.72, roughness: 0.05, metalness: 0.1, depthWrite: false }), { shadow: false });
+  water.position.y = H - 0.15; water.renderOrder = 2;
+  /* Stehleiter (A-Form, von beiden Seiten begehbar) an der Längsseite zum Garten hin (lokal −z),
+     steht ganz außerhalb des Pools, die beiden Leiterseiten spreizen sich entlang der Poolwand. */
+  {
+    const P1 = [c1 + r1 * Math.cos(al), r1 * Math.sin(al)], P2 = [c2 + r2 * Math.cos(al), r2 * Math.sin(al)];
+    const tx = P2[0] - P1[0], ty = P2[1] - P1[1], tl = Math.hypot(tx, ty);
+    const mx = (P1[0] + P2[0]) / 2, my = (P1[1] + P2[1]) / 2, nx = ty / tl * -1, ny = tx / tl;   // Normale nach außen (+y Shape = −z Welt)
+    const steel = M('#c3c8cc', { metalness: 0.6, roughness: 0.35 }), tread = M('#d9dcdf', { roughness: 0.6 });
+    const lad = new THREE.Group();
+    const off = 0.32;                                                  // Abstand der Leitermitte zur Wand
+    lad.position.set(mx + nx * off, 0, -(my + ny * off));
+    lad.rotation.y = Math.atan2(ty, tx);                               // lokal x entlang der Wand
+    pool.add(lad);
+    const top = H + 0.12, spread = 0.55, wid = 0.5;
+    [-1, 1].forEach(side => {
+      [-wid / 2, wid / 2].forEach(z => {
+        const A = new THREE.Vector3(side * spread, 0, z), B = new THREE.Vector3(side * 0.08, top, z);
+        const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, A.distanceTo(B), 8), steel);
+        rail.position.copy(A).add(B).multiplyScalar(0.5);
+        rail.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+        rail.castShadow = true; lad.add(rail);
+      });
+      for (let k = 1; k <= 3; k++) {
+        const h = k * top / 4, st = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.03, wid), tread);
+        st.position.set(side * (spread - (spread - 0.08) * h / top), h, 0); st.castShadow = true; lad.add(st);
+      }
+    });
+    const plat = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.035, wid + 0.04), tread);
+    plat.position.set(0, top, 0); plat.castShadow = true; lad.add(plat);
+  }
+  const col = addMesh(new THREE.BoxGeometry(len, H, 2 * r2), mat.rail, groups.site, { collide: true, shadow: false });
+  col.position.set(cx, base + H / 2, cz); col.visible = false;
+}
 
 // Fahrrad (Ursprung am Boden, Länge entlang lokal x, Vorderrad bei +x)
 function makeBike(color) {
@@ -2350,8 +2424,8 @@ document.getElementById('toggle').addEventListener('click', e => {
   e.currentTarget.textContent = min ? '+' : '–';
   e.currentTarget.setAttribute('aria-label', min ? 'Panel ausklappen' : 'Panel einklappen');
 });
-// am Handy startet das Panel eingeklappt
-if (matchMedia('(max-width: 520px)').matches) {
+// das Panel startet überall eingeklappt (wie am Handy)
+{
   panel.classList.add('min');
   const tg = document.getElementById('toggle'); tg.textContent = '+'; tg.setAttribute('aria-label', 'Panel ausklappen');
 }
