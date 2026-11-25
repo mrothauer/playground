@@ -96,7 +96,7 @@
 <div id="stage"></div>
 
 <section class="panel" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 17:32</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 19:00</small></h1>
   <button id="toggle" aria-label="Panel einklappen">–</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -203,6 +203,23 @@ Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 38, bottom: -38, n
 sun.shadow.bias = -0.0003;
 sun.shadow.normalBias = 0.02;
 scene.add(sun);
+
+// Sichtbare Sonne am Himmel, genau in Richtung des Sonnenlichts (passt zu den Schatten)
+{
+  const dir = sun.position.clone().sub(sun.target.position).normalize();
+  const sunPos = sun.target.position.clone().add(dir.multiplyScalar(160));
+  const disc = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 16), new THREE.MeshBasicMaterial({ color: '#fff6d8', fog: false }));
+  disc.position.copy(sunPos); scene.add(disc);
+  // weicher Schein um die Sonne
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d'), grd = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  grd.addColorStop(0, 'rgba(255,244,210,1)'); grd.addColorStop(0.18, 'rgba(255,232,170,0.75)');
+  grd.addColorStop(0.45, 'rgba(255,214,130,0.22)'); grd.addColorStop(1, 'rgba(255,210,120,0)');
+  g.fillStyle = grd; g.fillRect(0, 0, 256, 256);
+  const glowTex = new THREE.CanvasTexture(c); glowTex.colorSpace = THREE.SRGBColorSpace;
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, depthWrite: false, fog: false, blending: THREE.AdditiveBlending }));
+  glow.scale.set(40, 40, 1); glow.position.copy(sunPos); scene.add(glow);
+}
 
 // Dachziegel anthrazit: Textur für 1 m × 1 m (u = quer zur Traufe, v = entlang der Traufe)
 function roofTileTexture() {
