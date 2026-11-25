@@ -96,7 +96,7 @@
 <div id="stage"></div>
 
 <section class="panel" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 20:00</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 20:10</small></h1>
   <button id="toggle" aria-label="Panel einklappen">–</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -1458,6 +1458,37 @@ for (const [band, h0, h1] of [['eg', 0, 2.62], ['og', 2.96, 5.49]]) {
   wall('x', 727.4, 728, 29, 988, h0, h1, extW.south, mat.inner, g, false, false);
   wall('z', 29, 29.6, 29, 728, h0, h1, extW.west, mat.inner, g, false, false);
   wall('z', 987.4, 988, 29, 728, h0, h1, extW.east, mat.inner, g, false, false);
+}
+
+/* Stores (Innenvorhänge): weißer, leicht durchscheinender Stoff in weichen Falten an einer Schiene
+   innen über jedem Fenster; bei Fenstern bis aufs Fensterbrett, bei Terrassen- und Balkontür bis zum Boden.
+   Die Haustür bleibt frei. */
+{
+  const storeMat = new THREE.MeshStandardMaterial({ color: '#fbfaf6', roughness: 1, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+  const railM = M('#f4f4f2', { roughness: 0.5 });
+  // Innenkante der Wand (Plan-cm) und Richtung ins Haus
+  const inner = { north: [29.6, 1], south: [727.4, -1], west: [29.6, 1], east: [987.4, -1] };
+  for (const [side, list] of Object.entries(extW)) {
+    const [face, dir] = inner[side], alongX = side === 'north' || side === 'south';
+    for (const o of list) {
+      if (side === 'west' && o.kind === 'door') continue;            // Haustür
+      const og = o.t > 2.96, g = og ? groups.og : groups.eg, floor = og ? 2.96 : 0;
+      const a = o.a - 12, b = o.b + 12, top = o.t + 0.12, bot = o.kind === 'door' ? floor + 0.01 : o.s + 0.01;
+      const W = (b - a) / 100, H = top - bot, depth = face + dir * 7;
+      // Falten: Wellen quer zur Wand, ca. 10 cm Abstand, 3 cm Tiefe
+      const nx = Math.max(8, Math.round(W / 0.0125)), geo = new THREE.PlaneGeometry(W, H, nx, 1), pos = geo.attributes.position;
+      for (let i = 0; i < pos.count; i++) pos.setZ(i, Math.sin(pos.getX(i) / 0.10 * Math.PI * 2) * 0.03);
+      geo.computeVertexNormals();
+      const m = addMesh(geo, storeMat, g, { shadow: false });
+      m.renderOrder = 3;
+      m.position.y = bot + H / 2;
+      if (alongX) m.position.set(X((a + b) / 2), bot + H / 2, Z(depth));
+      else { m.position.set(X(depth), bot + H / 2, Z((a + b) / 2)); m.rotation.y = Math.PI / 2; }
+      // Vorhangschiene
+      if (alongX) box(a - 3, b + 3, depth - 1.5, depth + 1.5, top, top + 0.025, railM, g, { shadow: false });
+      else box(depth - 1.5, depth + 1.5, a - 3, b + 3, top, top + 0.025, railM, g, { shadow: false });
+    }
+  }
 }
 
 /* ---------- Dach: Satteldach 22°, First +7,86, Traufe Ü 90 cm, Ortgang Ü 80 cm ---------- */
