@@ -96,7 +96,7 @@
 <div id="stage"></div>
 
 <section class="panel" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 19:00</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 20:00</small></h1>
   <button id="toggle" aria-label="Panel einklappen">–</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -123,7 +123,6 @@
     <div class="jumps toggles" style="margin-top:8px">
       <button class="btn" id="tCars" aria-pressed="false">Autos</button>
       <button class="btn" id="tShelter" aria-pressed="true">Fahrradunterstand</button>
-      <button class="btn" id="cpView">Ansehen</button>
     </div>
   </div>
   <button class="btn primary" id="walkBtn">Rundgang starten</button>
@@ -2304,7 +2303,6 @@ const toggleBtn = (id, obj) => {
 };
 toggleBtn('tCars', carport.cars);
 toggleBtn('tShelter', shelterG);
-document.getElementById('cpView').addEventListener('click', carportView);
 // Grundstücksbezeichnungen (Parzellennummern), standardmäßig aus
 let showSiteLabels = false;
 siteLabels.forEach(l => l.visible = false);
