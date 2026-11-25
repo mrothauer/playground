@@ -1,0 +1,2425 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Haus Rundgang 3D</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: full-bleed 3D canvas, one floating control panel, walk HUD on demand */
+  :root {
+    --bg: #dfe7ee;
+    --panel: rgba(255, 255, 255, 0.88);
+    --fg: #1f2a33;
+    --muted: #5d6b76;
+    --line: rgba(31, 42, 51, 0.14);
+    --accent: #8a5a2b;
+    --accent-fg: #ffffff;
+    --chip: #eef1f3;
+    --label-bg: rgba(255, 255, 255, 0.92);
+    --font-ui: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --font-head: "Space Grotesk", "Inter", system-ui, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1a2128; --panel: rgba(24, 31, 38, 0.9); --fg: #e8edf1; --muted: #9fb0bd;
+      --line: rgba(232, 237, 241, 0.14); --accent: #d49a5e; --accent-fg: #1a1208; --chip: #26313b;
+      --label-bg: rgba(24, 31, 38, 0.92); color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1a2128; --panel: rgba(24, 31, 38, 0.9); --fg: #e8edf1; --muted: #9fb0bd;
+    --line: rgba(232, 237, 241, 0.14); --accent: #d49a5e; --accent-fg: #1a1208; --chip: #26313b;
+    --label-bg: rgba(24, 31, 38, 0.92); color-scheme: dark;
+  }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-ui); overflow: hidden; }
+  #stage { position: fixed; inset: 0; touch-action: none; }
+  #stage canvas { display: block; }
+  .panel {
+    position: absolute; z-index: 5;
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    left: max(16px, env(safe-area-inset-left, 0px));
+    width: min(300px, calc(100vw - 32px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px; display: grid; gap: 12px; backdrop-filter: blur(10px); box-sizing: border-box;
+    max-height: calc(100dvh - 24px); overflow-y: auto;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+  }
+  .panel h1 { margin: 0; font: 600 17px/1.2 var(--font-head); text-wrap: balance; }
+  .panel p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
+  .eyebrow { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--chip); padding: 4px; border-radius: 9px; }
+  .seg button, .btn {
+    font: 500 13px/1 var(--font-ui); color: var(--fg); background: transparent; border: 0;
+    padding: 9px 6px; border-radius: 7px; cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--panel); box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); padding: 11px 12px; font-weight: 600; width: 100%; }
+  .btn.ghost { background: var(--chip); }
+  button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
+  .jumps .btn { background: var(--chip); padding: 8px 10px; font-size: 12.5px; }
+  .seg.seg4 { grid-template-columns: repeat(5, 1fr); }
+  .toggles .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  #cpInfo b { color: var(--fg); font-weight: 600; }
+  .collapse { justify-self: end; margin-top: -6px; }
+  #toggle { position: absolute; top: 10px; right: 10px; background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 8px; }
+  .panel.min > :not(h1):not(#toggle) { display: none; }
+  .hud {
+    position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
+    top: calc(12px + env(safe-area-inset-top, 0px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+    padding: 8px 16px; font: 600 14px/1 var(--font-head); white-space: nowrap;
+  }
+  .hud small { font: 400 12px var(--font-ui); color: var(--muted); margin-left: 8px; }
+  .label {
+    background: var(--label-bg); color: var(--fg); border: 1px solid var(--line);
+    border-radius: 6px; padding: 4px 7px; font: 600 11.5px/1.25 var(--font-ui); text-align: center;
+    pointer-events: none; white-space: nowrap;
+  }
+  .label.muted { font-weight: 500; font-size: 10.5px; color: var(--muted); padding: 2px 6px; opacity: .9; }
+  .label span { display: block; font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
+  #joy {
+    position: absolute; z-index: 6; width: 120px; height: 120px; border-radius: 50%;
+    left: max(24px, calc(env(safe-area-inset-left, 0px) + 16px));
+    bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel); border: 1px solid var(--line); touch-action: none;
+  }
+  #knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: var(--accent); opacity: .85; }
+  .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  kbd { font: 600 11px var(--font-ui); background: var(--chip); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  #err { position: absolute; inset: auto 16px 16px 16px; z-index: 9; background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--line); }
+  @media (max-width: 520px) { .panel { width: auto; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); } .hud { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); } }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600&display=swap">
+
+<div id="stage"></div>
+
+<section class="panel" id="panel">
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 17:32</small></h1>
+  <button id="toggle" aria-label="Panel einklappen">–</button>
+  <div id="orbitUi">
+    <div class="eyebrow">Ansicht</div>
+    <div class="seg" role="group" aria-label="Ansicht">
+      <button id="v-aussen" aria-pressed="true">Außen</button>
+      <button id="v-og" aria-pressed="false">OG offen</button>
+      <button id="v-eg" aria-pressed="false">EG offen</button>
+    </div>
+    <div class="jumps toggles" style="margin-top:8px">
+      <button class="btn" id="tLabels" aria-pressed="false">Grundstücksbezeichnungen</button>
+    </div>
+  </div>
+  <p id="orbitHelp">Ziehen zum Drehen, Rad oder zwei Finger zum Zoomen, rechte Maustaste zum Verschieben. Maße aus dem Polierplan, Maßstab 1:50.</p>
+  <div id="carportUi">
+    <div class="eyebrow">Carport-Planung</div>
+    <div class="seg seg4" role="group" aria-label="Carport-Variante">
+      <button data-cp="0" aria-pressed="true">Ist</button>
+      <button data-cp="1" aria-pressed="false">Var. 1</button>
+      <button data-cp="2" aria-pressed="false">Var. 2</button>
+      <button data-cp="3" aria-pressed="false">Var. 3</button>
+      <button data-cp="4" aria-pressed="false">Var. 4</button>
+    </div>
+    <p id="cpInfo" style="margin-top:8px"></p>
+    <div class="jumps toggles" style="margin-top:8px">
+      <button class="btn" id="tCars" aria-pressed="false">Autos</button>
+      <button class="btn" id="tShelter" aria-pressed="true">Fahrradunterstand</button>
+      <button class="btn" id="cpView">Ansehen</button>
+    </div>
+  </div>
+  <button class="btn primary" id="walkBtn">Rundgang starten</button>
+  <div id="walkUi" hidden>
+    <div class="eyebrow">Springen zu</div>
+    <div class="jumps">
+      <button class="btn" data-jump="eingang">Haustür</button>
+      <button class="btn" data-jump="wohnen">Wohnen</button>
+      <button class="btn" data-jump="kueche">Küche</button>
+      <button class="btn" data-jump="og">Obergeschoss</button>
+      <button class="btn" data-jump="balkon">Balkon</button>
+      <button class="btn" data-jump="terrasse">Terrasse</button>
+      <button class="btn" data-jump="carport">Carport</button>
+    </div>
+    <p class="help" style="margin-top:10px"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> oder Pfeiltasten gehen, Maus ziehen schaut um, <kbd>Shift</kbd> schneller. Am Handy: links Joystick, rechts wischen.</p>
+  </div>
+</section>
+
+<div class="hud" id="hud" hidden>Außen</div>
+<div id="joy" hidden><div id="knob"></div></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+/* ---------- Koordinaten ----------
+   Plan-Koordinaten in cm: x von der Westkante (Rohbau-Außenkante) nach Osten 0…1017,
+   y von der Nordkante nach Süden 0…757. VWS 9 cm außen → Außenmaß 1035 × 775.
+   Höhen in m, ±0,00 = FFBOK EG, OG-Fußboden +2,96, First +7,86. */
+const X = x => x / 100 - 5.085;
+const Z = y => y / 100 - 3.785;
+
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.domElement.style.cssText = 'position:absolute;inset:0;pointer-events:none';
+stage.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#cfe0ec');
+scene.fog = new THREE.Fog('#cfe0ec', 90, 220);
+
+const camera = new THREE.PerspectiveCamera(42, 1, 0.05, 300);
+camera.position.set(-23.49, 23, 22.66);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(-4.59, 0, 3.22);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.minDistance = 3;
+controls.maxDistance = 95;
+
+// Licht
+scene.add(new THREE.HemisphereLight('#ffffff', '#a39f8e', 1.5));
+scene.add(new THREE.AmbientLight('#ffffff', 0.35));
+const sun = new THREE.DirectionalLight('#fff3df', 2.0);
+// Schattenbereich deckt das ganze Grundstück samt Zäunen ab (vorher nur ±18 m ums Haus)
+sun.target.position.set(6, 0, 4);
+sun.position.set(6 + 14, 22, 4 + 10);
+scene.add(sun.target);
+sun.castShadow = true;
+sun.shadow.mapSize.set(4096, 4096);
+Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 38, bottom: -38, near: 1, far: 110 });
+sun.shadow.bias = -0.0003;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+// Dachziegel anthrazit: Textur für 1 m × 1 m (u = quer zur Traufe, v = entlang der Traufe)
+function roofTileTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 512;
+  const g = c.getContext('2d');
+  const rows = 3, cols = 3, rw = 512 / rows, ch = 512 / cols;
+  for (let r = 0; r < rows; r++) {
+    for (let k = -1; k < cols + 1; k++) {
+      const y0 = k * ch + (r % 2) * ch / 2, x0 = r * rw;
+      const shade = 52 + Math.floor(Math.random() * 10);
+      const grd = g.createLinearGradient(x0, 0, x0 + rw, 0);
+      grd.addColorStop(0, `rgb(${shade + 14},${shade + 16},${shade + 19})`);
+      grd.addColorStop(0.8, `rgb(${shade},${shade + 2},${shade + 5})`);
+      grd.addColorStop(1, `rgb(${shade - 22},${shade - 21},${shade - 19})`);
+      g.fillStyle = grd; g.fillRect(x0, y0, rw, ch);
+      // Wölbung des Ziegels
+      const w = g.createLinearGradient(0, y0, 0, y0 + ch);
+      w.addColorStop(0, 'rgba(0,0,0,0.25)'); w.addColorStop(0.5, 'rgba(255,255,255,0.06)'); w.addColorStop(1, 'rgba(0,0,0,0.25)');
+      g.fillStyle = w; g.fillRect(x0, y0, rw, ch);
+      g.fillStyle = 'rgba(20,21,23,0.9)'; g.fillRect(x0, y0, rw, 3);
+    }
+    g.fillStyle = 'rgba(15,16,18,0.95)'; g.fillRect(r * rw + rw - 6, 0, 6, 512);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+}
+
+// Materialien
+const M =(color, extra = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.85, ...extra });
+const mat = {
+  facade: M('#e7e1cd'), inner: M('#f3f0e8'), plinth: M('#6e5543'),
+  floorWood: M('#c4a074'), tile: M('#c9cdd0'), slab: M('#e9e6df'),
+  roof: M('#ffffff', { roughness: 0.75, map: roofTileTexture() }), wood: M('#9a6a3e'), frame: M('#5b3a22'),
+  glass: new THREE.MeshStandardMaterial({ color: '#a9cbe0', transparent: true, opacity: 0.28, roughness: 0.05, metalness: 0.1, depthWrite: false }),
+  grass: M('#7f9e5a'), paving: M('#b3aea6'), container: M('#e9e7e1'), rail: M('#3e3a36'),
+  white: M('#f7f7f5'), sofa: M('#6b7b8c'), bed: M('#dcd6cc'), stair: M('#b98b58'),
+  dark: M('#4a4d50'), steel: M('#9aa0a6', { metalness: 0.4, roughness: 0.5 }),
+};
+
+// Gruppen für die Ansichten
+const groups = { site: new THREE.Group(), eg: new THREE.Group(), og: new THREE.Group(), roof: new THREE.Group() };
+Object.values(groups).forEach(g => scene.add(g));
+
+const colliders = [];   // Boxen, die den Weg versperren
+const walkables = [];   // Flächen, auf denen man steht
+
+function addMesh(geo, material, group, { collide = false, walk = false, shadow = true } = {}) {
+  const m = new THREE.Mesh(geo, material);
+  m.castShadow = shadow; m.receiveShadow = true;
+  group.add(m);
+  if (walk) walkables.push(m);
+  if (collide) colliders.push(m);
+  return m;
+}
+
+// Box in Plan-cm (x0..x1, y0..y1) und Höhe in m (h0..h1)
+function box(x0, x1, y0, y1, h0, h1, material, group, opts) {
+  const w = Math.abs(x1 - x0) / 100, d = Math.abs(y1 - y0) / 100, h = h1 - h0;
+  if (w <= 0 || d <= 0 || h <= 0) return null;
+  const m = addMesh(new THREE.BoxGeometry(w, h, d), material, group, opts);
+  m.position.set(X((x0 + x1) / 2), (h0 + h1) / 2, Z((y0 + y1) / 2));
+  return m;
+}
+
+/* Wand mit Öffnungen.
+   axis 'x': Wand läuft entlang x (from..to), Dicke über y (t0..t1). axis 'z': umgekehrt.
+   openings: {a,b} entlang der Wand (cm), {s,t} Höhe (m), kind 'win' | 'door'. */
+function wall(axis, t0, t1, from, to, h0, h1, openings, material, group, collide = true, fittings = true) {
+  const pts = new Set([from, to]);
+  openings.forEach(o => { if (o.a > from && o.a < to) pts.add(o.a); if (o.b > from && o.b < to) pts.add(o.b); });
+  const cuts = [...pts].sort((a, b) => a - b);
+  const mk = (p, q, s, t, m, c) => axis === 'x' ? box(p, q, t0, t1, s, t, m, group, { collide: c }) : box(t0, t1, p, q, s, t, m, group, { collide: c });
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const p = cuts[i], q = cuts[i + 1];
+    const holes = openings.filter(o => o.a <= p && o.b >= q).map(o => [Math.max(o.s, h0), Math.min(o.t, h1)]).filter(([s, t]) => t > s).sort((a, b) => a[0] - b[0]);
+    let cur = h0;
+    for (const [s, t] of holes) { if (s > cur) mk(p, q, cur, s, material, collide); cur = Math.max(cur, t); }
+    if (cur < h1) mk(p, q, cur, h1, material, collide);
+  }
+  // Fenster und Türrahmen
+  const mid = (t0 + t1) / 2, f = 6;
+  if (fittings) openings.forEach(o => {
+    if (o.s < h0 - 0.001 || o.t > h1 + 0.001) return;
+    const fh = 0.06;
+    const fr = (p, q, s, t) => axis === 'x' ? box(p, q, mid - 4, mid + 4, s, t, mat.frame, group) : box(mid - 4, mid + 4, p, q, s, t, mat.frame, group);
+    fr(o.a, o.a + f, o.s, o.t); fr(o.b - f, o.b, o.s, o.t); fr(o.a, o.b, o.t - fh, o.t);
+    if (o.kind === 'win') {
+      fr(o.a, o.b, o.s, o.s + fh);
+      const g = axis === 'x' ? box(o.a + f, o.b - f, mid - 1, mid + 1, o.s + fh, o.t - fh, mat.glass, group, { collide: true, shadow: false })
+                             : box(mid - 1, mid + 1, o.a + f, o.b - f, o.s + fh, o.t - fh, mat.glass, group, { collide: true, shadow: false });
+      if (g) g.renderOrder = 2;
+      // Fensterbank innen
+      if (axis === 'x') box(o.a, o.b, t0 < 300 ? t1 - 2 : t0 - 4, t0 < 300 ? t1 + 4 : t0 + 2, o.s - 0.03, o.s, mat.white, group);
+      else box(t0 < 300 ? t1 - 2 : t0 - 4, t0 < 300 ? t1 + 4 : t0 + 2, o.a, o.b, o.s - 0.03, o.s, mat.white, group);
+    }
+  });
+}
+
+/* ---------- Gelände ----------
+   Höhen relativ zu ±0,00 = Fußboden EG. Das Gelände fällt zur Straße (Plan −x):
+   vorne und neben dem schmalen Streifen (x ≤ 500) −0,47, am Ende des Streifens steigt es bis x 700 auf −0,20
+   (Garten neben und hinter der breiten Terrasse, dort eine gleich hohe Stufe). Breite Terrasse ±0,00 (ebenerdig zur Terrassentür), schmaler Betonstreifen −0,30. */
+const GN = -0.47, G = -0.30, STRIP = -0.30, K1 = 500, K2 = 700;   // Streifen → Schotter: 17 cm Stufe; Wiese westlich des Streifens und hinter der Terrasse bündig mit dem Streifen (−0,30)
+const gAt = x => x <= K1 ? GN : x >= K2 ? G : GN + (G - GN) * (x - K1) / (K2 - K1);   // Plan-x in cm
+const gw = Xw => gAt(Xw * 100 + 508.5);                                                 // Welt-X in m
+const groundGeo = new THREE.PlaneGeometry(160, 160, 640, 1);
+groundGeo.rotateX(-Math.PI / 2);
+{ const p = groundGeo.attributes.position; for (let i = 0; i < p.count; i++) p.setY(i, gw(p.getX(i))); groundGeo.computeVertexNormals(); }
+const ground = addMesh(groundGeo, mat.grass, groups.site, { walk: true, shadow: false });
+// Dreiecke einer flachen Fläche an den Knickstellen K1/K2 teilen und aufs Gelände legen
+function drapeGeometry(geo, dy) {
+  const src = geo.index ? geo.toNonIndexed() : geo, p = src.attributes.position, out = [];
+  const cuts = [X(K1), X(K2)];
+  const clip = (poly, xc, keepLeft) => {
+    const res = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      const ina = keepLeft ? a[0] <= xc : a[0] >= xc, inb = keepLeft ? b[0] <= xc : b[0] >= xc;
+      if (ina) res.push(a);
+      if (ina !== inb) { const t = (xc - a[0]) / (b[0] - a[0]); res.push([xc, a[1] + (b[1] - a[1]) * t]); }
+    }
+    return res;
+  };
+  for (let i = 0; i < p.count; i += 3) {
+    let polys = [[[p.getX(i), p.getZ(i)], [p.getX(i + 1), p.getZ(i + 1)], [p.getX(i + 2), p.getZ(i + 2)]]];
+    for (const xc of cuts) polys = polys.flatMap(pl => [clip(pl, xc, true), clip(pl, xc, false)]).filter(pl => pl.length >= 3);
+    for (const pl of polys) for (let k = 1; k < pl.length - 1; k++) for (const q of [pl[0], pl[k], pl[k + 1]]) out.push(q[0], gw(q[0]) + dy, q[1]);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3));
+  // UV = Welt-x/z in Metern (wie bei ShapeGeometry), für Texturen
+  const uv = []; for (let i = 0; i < out.length; i += 3) uv.push(out[i], -out[i + 2]);
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+/* ---------- Grundstück 1004/5 und Nachbarn ----------
+   Aus dem Absteckplan (Vektordaten) in Haus-Koordinaten umgerechnet: Plan-cm, Haus mittig auf das
+   abgesteckte Rechteck 10,03 × 7,43 m gelegt. Plan-Westen (Haustür) zeigt zur Straße 996/1. */
+const SITE = {"own":[[3699,1604],[143,1792],[84,1649],[18,1511],[-58,1379],[-141,1248],[-231,1125],[-329,1008],[-434,895],[-1689,-451],[3667,-449],[3696,1275]],"roadA":[[417,4707],[307,2570],[298,2436],[279,2304],[256,2175],[226,2044],[188,1917],[143,1792],[84,1649],[18,1511],[-58,1379],[-141,1248],[-231,1125],[-329,1008],[-434,895],[-1689,-451],[-2351,-1162],[-2440,-1266]],"roadB":[[-144,4531],[-230,2885],[-242,2597],[-253,2463],[-274,2330],[-304,2199],[-341,2070],[-388,1944],[-442,1821],[-505,1704],[-574,1589],[-652,1480],[-735,1377],[-827,1280],[-1047,1044],[-2632,-652]],"lines":[[[3993,-4340],[5735,-4051]],[[-2354,-1158],[-1692,-448]],[[-253,-2401],[-2064,-2457]],[[-2630,-658],[-1044,1041]],[[-1047,1044],[-3198,1161]],[[-434,895],[-1689,-451]],[[-442,1821],[-505,1704]],[[-505,1704],[-574,1589]],[[-574,1589],[-652,1480]],[[-652,1480],[-735,1377]],[[-735,1377],[-827,1280]],[[-242,2597],[-253,2463]],[[-253,2463],[-274,2330]],[[-274,2330],[-304,2199]],[[-304,2199],[-341,2070]],[[-341,2070],[-388,1944]],[[-388,1944],[-442,1821]],[[-226,2884],[-3799,3077]],[[143,1792],[84,1649]],[[84,1649],[18,1511]],[[18,1511],[-58,1379]],[[-58,1379],[-141,1248]],[[-141,1248],[-231,1125]],[[-231,1125],[-329,1008]],[[-329,1008],[-434,895]],[[307,2570],[298,2436]],[[298,2436],[279,2304]],[[279,2304],[256,2175]],[[256,2175],[226,2044]],[[226,2044],[188,1917]],[[188,1917],[143,1792]],[[-226,2884],[-135,4532]],[[302,2571],[417,4707]],[[3989,-4341],[3633,-2272]],[[3637,-2276],[-254,-2406]],[[3633,-2270],[3643,-1645]],[[3643,-1645],[3662,-449]],[[3666,-454],[-1690,-456]],[[3667,-449],[3696,1275]],[[3696,1275],[3699,1604]],[[3699,1604],[143,1792]],[[3647,-1645],[4915,-1434]],[[3696,1275],[4052,1320]],[[3707,2419],[3694,1604]]],"stones":[[-242,2598],[-1688,-452],[-433,896],[3667,-450],[3648,-1644],[3636,-2272],[3994,-4341],[-227,2884],[-442,1821],[-2349,-1162],[3698,1603],[308,2569],[-1046,1043],[-254,-2401],[143,1791],[-826,1279],[3696,1276]],"texts":[["1004/3",-2072,998],["1004/2",-1573,2495],["1004/4",1026,-1195],["995/6",-737,-2590],["995/1",364,-2546],["996/2",4160,-1662],["998",4506,162],["1002/8",2426,3263],["1002/7",-1037,3994],["996/1",107,2968]]};
+/* Tatsächliche Lage: Haus samt Container, Terrasse, Pergola, Betonflächen und Wärmepumpe steht
+   gegenüber dem Absteckplan verschoben (kurz vor Baubeginn). Laut BEV-Katastralmappe (Gebäudeumriss
+   relativ zu den Grenzpunkten 14477/14494/14495): ca. 2,7 m nach Süden (Plan +x) und 0,8 m nach
+   Westen (Plan +y). Das Modell bleibt im Haus-Koordinatensystem, deshalb wird stattdessen das
+   Grundstück in die Gegenrichtung verschoben. */
+const SITE_SHIFT_X = -270, SITE_SHIFT_Y = -80;
+{
+  const sh = p => [p[0] + SITE_SHIFT_X, p[1] + SITE_SHIFT_Y];
+  ['own', 'roadA', 'roadB', 'stones'].forEach(k => SITE[k] = SITE[k].map(sh));
+  SITE.lines = SITE.lines.map(l => l.map(sh));
+  SITE.texts = SITE.texts.map(([t, x, y]) => [t, x + SITE_SHIFT_X, y + SITE_SHIFT_Y]);
+}
+const siteLabels = [];
+{
+  // dy: Höhe über dem Gelände (m); die Fläche folgt dem Gefälle
+  const flat = (pts, dy, material, order = 0) => {
+    const s = profileShape(pts.map(([x, z]) => [X(x), -Z(z)]));
+    const g = new THREE.ShapeGeometry(s); g.rotateX(-Math.PI / 2);
+    const m = addMesh(drapeGeometry(g, dy), material, groups.site, { shadow: false }); m.renderOrder = order;
+    return m;
+  };
+  // eigener Rasen etwas heller, Straße asphaltiert
+  flat(SITE.own, 0.004, M('#8fae62', { polygonOffset: true, polygonOffsetFactor: -1 }));
+  /* Schotterfläche im spitzen Nordteil: vom Containerende (x 400) bis zur Straße, vor der Haustür
+     um den Betonstreifen herum und in dessen Flucht nach Westen bis in den Spitz, wo der Zaun beginnt. */
+  {
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#8f887c'; g.fillRect(0, 0, 256, 256);
+    for (let i = 0; i < 1400; i++) {
+      const x = Math.random() * 256, y = Math.random() * 256, v = 110 + Math.floor(Math.random() * 120), r = 3 + Math.random() * 6, warm = Math.floor(Math.random() * 18);
+      g.fillStyle = 'rgba(40,36,30,0.55)';
+      g.beginPath(); g.ellipse(x + 1.5, y + 2, r, r * 0.75, Math.random() * 3, 0, 7); g.fill();
+      g.fillStyle = `rgb(${v + warm},${v + warm / 2},${v - 6})`;
+      g.beginPath(); g.ellipse(x, y, r, r * (0.6 + Math.random() * 0.35), Math.random() * 3, 0, 7); g.fill();
+      g.fillStyle = 'rgba(255,255,255,0.22)';
+      g.beginPath(); g.ellipse(x - r * 0.3, y - r * 0.3, r * 0.35, r * 0.25, 0, 0, 7); g.fill();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 2);
+    // Westkante exakt in der Flucht der Außenkante des Betonstreifens (x −159) bis zur Straße
+    // Straßenkante des Grundstücks von der Ostecke bis dorthin, wo die Flucht x −159 sie schneidet
+    const edge = SITE.own.slice(1, 10).reverse();       // Ostecke an der Straße … Nordwestspitz
+    const roadEdge = [];
+    let cut = null;
+    for (let i = 0; i < edge.length; i++) {
+      if (edge[i][0] >= -159) { const a = edge[i - 1], b = edge[i], t = (-159 - a[0]) / (b[0] - a[0]); cut = [-159, a[1] + t * (b[1] - a[1])]; break; }
+      roadEdge.push(edge[i]);
+    }
+    const eastY = SITE.own[9][1] + (SITE.own[10][1] - SITE.own[9][1]) * (400 - SITE.own[9][0]) / (SITE.own[10][0] - SITE.own[9][0]);
+    const gravel = [[400, eastY], ...roadEdge, cut, [-159, 240], [-9, 240], [-9, -9], [400, -9]];
+    flat(gravel, 0.007, M('#ffffff', { map: tex, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+  }
+  /* Wiese westlich des schmalen Streifens: eben auf −0,30 (bündig mit dem Streifen, gleich hoch wie die
+     Wiese hinter der Terrasse); zum Schotter im Norden (Flucht x −159) eine 17 cm Kante. */
+  {
+    const pts = [[-159, 916], [617, 916], [617, 1116], [700, 1116], [700, 1668], [-81, 1700], [-140, 1552], [-159, 1510]];   // endet am Schwemmholzzaun; davor (Mülltonnen) Straßenniveau
+    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(X(x), -Z(y))));
+    const geo = new THREE.ExtrudeGeometry(s, { depth: STRIP - GN + 0.03, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2); geo.translate(0, GN - 0.03, 0);
+    addMesh(geo, [M('#8fae62'), M('#6f8a4c')], groups.site, { walk: true, shadow: false });
+  }
+  // Straßenparzelle 996/1: außen Bankett (Schotter), innen Asphalt, je Seite 50 cm Bankett
+  const BANKETT = 50;
+  const offsetToward = (pts, other, d) => pts.map((p, i) => {
+    const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)];
+    const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+    let nx = -ty / tl, ny = tx / tl;
+    const q = other.reduce((best, o) => Math.hypot(o[0] - p[0], o[1] - p[1]) < Math.hypot(best[0] - p[0], best[1] - p[1]) ? o : best, other[0]);
+    if (nx * (q[0] - p[0]) + ny * (q[1] - p[1]) < 0) { nx = -nx; ny = -ny; }
+    return [p[0] + nx * d, p[1] + ny * d];
+  });
+  flat([...SITE.roadA, ...SITE.roadB.slice().reverse()], 0.005, M('#a39a87', { roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+  /* Auf unserer Seite: ab dem Nordost-Spitz 10 m lang reicht der Asphalt bis an die Pflasterbegrenzung
+     (10 cm an der Grenze), danach runder Übergang zurück auf 50 cm Bankett. Dafür die Straßenkante
+     fein unterteilen und den Abstand je Punkt aus der Lauflänge ab dem Spitz bestimmen. */
+  const dense = [];
+  SITE.roadA.forEach((p, i) => {
+    if (i === 0) { dense.push(p); return; }
+    const a = SITE.roadA[i - 1], n = Math.max(1, Math.ceil(Math.hypot(p[0] - a[0], p[1] - a[1]) / 25));
+    for (let k = 1; k <= n; k++) dense.push([a[0] + (p[0] - a[0]) * k / n, a[1] + (p[1] - a[1]) * k / n]);
+  });
+  const tip = SITE.own[9];
+  const tipIdx = dense.reduce((best, p, i) => Math.hypot(p[0] - tip[0], p[1] - tip[1]) < Math.hypot(dense[best][0] - tip[0], dense[best][1] - tip[1]) ? i : best, 0);
+  const along = dense.map(() => Infinity);
+  along[tipIdx] = 0;
+  for (let i = tipIdx - 1; i >= 0; i--) along[i] = along[i + 1] + Math.hypot(dense[i][0] - dense[i + 1][0], dense[i][1] - dense[i + 1][1]);
+  const PAVE = 10, RUN = 1000, BLEND = 150;
+  const distAt = s => s <= RUN ? PAVE : s >= RUN + BLEND ? BANKETT : PAVE + (BANKETT - PAVE) * (1 - Math.cos(Math.PI * (s - RUN) / BLEND)) / 2;
+  const asphA = dense.map((p, i) => {
+    return offsetToward([dense[Math.max(0, i - 1)], p, dense[Math.min(dense.length - 1, i + 1)]], SITE.roadB, distAt(along[i]))[1];
+  });
+  const asphB = offsetToward(SITE.roadB, SITE.roadA, BANKETT);
+  flat([...asphA, ...asphB.slice().reverse()], 0.008, M('#5f6265', { roughness: 0.95, polygonOffset: true, polygonOffsetFactor: -3 }));
+  // Grenzlinien als schmale Bänder auf dem Boden
+  // Band in Stücken ≤ 1 m, jedes auf Geländehöhe (dy über Gelände)
+  const band = (a, b, w, material, dy) => {
+    const n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 100));
+    for (let k = 0; k < n; k++) {
+      const p = [a[0] + (b[0] - a[0]) * k / n, a[1] + (b[1] - a[1]) * k / n], q = [a[0] + (b[0] - a[0]) * (k + 1) / n, a[1] + (b[1] - a[1]) * (k + 1) / n];
+      const dx = (q[0] - p[0]) / 100, dz = (q[1] - p[1]) / 100, L = Math.hypot(dx, dz);
+      const m = addMesh(new THREE.BoxGeometry(L + 0.01, 0.01, w), material, groups.site, { shadow: false });
+      m.position.set(X((p[0] + q[0]) / 2), gAt((p[0] + q[0]) / 2) + dy, Z((p[1] + q[1]) / 2));
+      m.rotation.y = -Math.atan2(dz, dx);
+    }
+  };
+  const ownLine = M('#d9532f', { roughness: 0.6 }), otherLine = M('#f1eee6', { roughness: 0.8 });
+  SITE.lines.forEach(([a, b]) => band(a, b, 0.05, otherLine, 0.012));
+  SITE.own.forEach((p, i) => band(p, SITE.own[(i + 1) % SITE.own.length], 0.1, ownLine, 0.015));
+  // Grenzsteine
+  SITE.stones.forEach(([x, y]) => {
+    const st = addMesh(new THREE.CylinderGeometry(0.07, 0.08, 0.16, 12), M('#d9d4c8'), groups.site);
+    st.position.set(X(x), gAt(x) + 0.07, Z(y));
+    const cap = addMesh(new THREE.CylinderGeometry(0.071, 0.071, 0.03, 12), ownLine, groups.site, { shadow: false });
+    cap.position.set(X(x), gAt(x) + 0.15, Z(y));
+  });
+  // Parzellennummern
+  const lab = (text, x, y, cls = '') => {
+    const el = document.createElement('div'); el.className = 'label ' + cls; el.textContent = text;
+    const o = new CSS2DObject(el); o.position.set(X(x), 0.3, Z(y)); scene.add(o); siteLabels.push(o);
+  };
+  SITE.texts.forEach(([t, x, y]) => lab(t === '996/1' ? 'Straße 996/1' : 'Nachbar ' + t, x, y, 'muted'));
+  const cx = SITE.own.reduce((s, p) => s + p[0], 0) / SITE.own.length, cy = SITE.own.reduce((s, p) => s + p[1], 0) / SITE.own.length;
+  lab('Grundstück 1004/5', cx + 300, cy - 200);
+}
+
+/* Lärchenzäune 1,90 m. Unserer zum westlichen Nachbarn (1002/8), ca. 30 cm innerhalb der Grenze,
+   an der Südseite (zu 998) noch ca. 8 m ums Eck, beginnt ca. 1 m vor der Straße. Stehende Bretter, wechselseitig überlappend. */
+{
+  // + Zaun des Nachbarn an der Grenze zu 1004/4: 40 cm außerhalb, von der Spitze bis zur Hausvorderkante
+  const runs = [[[241, 1757], [3668, 1576]], [[3668, 1576], [3666, 1275]], [[3666, 1275], [3658, 776]], [[-1650, -491], [191, -490]]]
+    .map(r => r.map(([x, y]) => [x + SITE_SHIFT_X, y + SITE_SHIFT_Y]));
+  const boards = [], posts = [], rails = [], braces = [];
+  const fg = (x, ours) => ours ? Math.max(gw(x), STRIP) : gw(x);   // Westzaun steht in der Wiese auf −0,30
+  const inside = [X(508), Z(378)];                         // Richtung ins eigene Grundstück
+  const westPosts = []; let westLen = 0;                    // Steher des Westzauns entlang des ganzen Zauns
+  runs.forEach(([a, b], ri) => {
+    const ours = ri < 3;                                   // Westzaun (inkl. Eck zur Südseite)
+    const dx = (b[0] - a[0]) / 100, dz = (b[1] - a[1]) / 100, L = Math.hypot(dx, dz);
+    const ux = dx / L, uz = dz / L, nx = -uz, nz = ux, ang = -Math.atan2(dz, dx);
+    const at = (s, off) => [X(a[0]) + ux * s + nx * off, Z(a[1]) + uz * s + nz * off];
+    let k = 0;
+    // Bretter wechselseitig, beim Westzaun zusätzlich abwechselnd 2 cm höher
+    for (let s = 0.07; s < L - 0.02; s += 0.11) { const odd = k++ % 2; boards.push([...at(s, odd ? 0.024 : -0.024), ang, ours && odd ? 0.02 : 0, ours]); }
+    let pi = 0;
+    for (let s = 0; s <= L + 0.01; s += Math.min(2.0, L)) {
+      const ss = Math.min(s, L);
+      posts.push([...at(ss, 0), ang, ours]);
+      if (ours) {
+        const [px, pz] = at(ss, 0);
+        const sgn = (nx * (inside[0] - px) + nz * (inside[1] - pz)) > 0 ? 1 : -1;
+        westPosts.push({ px, pz, ix: nx * sgn, iz: nz * sgn, gs: westLen + ss, corner: ri === 0 && ss > L - 0.01 });
+      }
+      pi++;
+    }
+    {
+      const [mx, mz] = at(L / 2, 0);
+      const inSgn = (nx * (inside[0] - mx) + nz * (inside[1] - mz)) > 0 ? 1 : -1;
+      rails.push({ a: at(0, 0), ux, uz, ang, L, ours, ox: -nx * inSgn, oz: -nz * inSgn });   // ox/oz: Richtung nach außen
+    }
+    // Kollision in kurzen, achsparallelen Stücken
+    for (let s = 0; s < L; s += 0.5) {
+      const [px, pz] = at(Math.min(s + 0.25, L), 0);
+      const c = addMesh(new THREE.BoxGeometry(0.5 * Math.abs(ux) + 0.08, 1.9, 0.5 * Math.abs(uz) + 0.08), mat.rail, groups.site, { collide: true, shadow: false });
+      c.position.set(px, fg(px, ours) + 0.95, pz); c.visible = false;
+    }
+    if (ours) westLen += L;
+  });
+  // Schrägstützen am Westzaun: an jedem 2. Steher und an beiden Enden, aber nicht an der Innenecke
+  {
+    const wp = westPosts.sort((p, q) => p.gs - q.gs).filter((p, i, arr) => i === 0 || p.gs - arr[i - 1].gs > 0.05);
+    const cornerGs = (westPosts.find(p => p.corner) || {}).gs;
+    wp.forEach((p, i) => {
+      const end = i === 0 || i === wp.length - 1;
+      if (!(end || i % 2 === 1)) return;
+      if (cornerGs !== undefined && Math.abs(p.gs - cornerGs) < 2.1) return;
+      braces.push({ top: [p.px + p.ix * 0.05, fg(p.px, true) + 1.2, p.pz + p.iz * 0.05], foot: [p.px + p.ix * 0.6, fg(p.px + p.ix * 0.6, true), p.pz + p.iz * 0.6] });
+    });
+  }
+  const dummy = new THREE.Object3D();
+  const larchCols = ['#c99a62', '#bd8d55', '#d3a670', '#c39258', '#b98a57'].map(c => new THREE.Color(c));
+  const bm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.14, 1.85, 0.022), M('#ffffff', { roughness: 0.85 }), boards.length);
+  // unser Westzaun ist schon silbergrau verwittert, der Nachbarzaun noch lärchenbraun
+  const greyCols = ['#9b978f', '#8b877f', '#a8a399', '#7f7b74', '#b1aca2'].map(c => new THREE.Color(c));
+  boards.forEach(([x, z, r, dy, ours], i) => {
+    dummy.position.set(x, fg(x, ours) + 0.05 + 1.85 / 2 + dy, z); dummy.rotation.set(0, r, 0); dummy.updateMatrix();
+    const pal = ours ? greyCols : larchCols;
+    bm.setMatrixAt(i, dummy.matrix); bm.setColorAt(i, pal[(i * 7) % pal.length]);
+  });
+  bm.castShadow = bm.receiveShadow = true; groups.site.add(bm);
+  const pm = new THREE.InstancedMesh(new THREE.BoxGeometry(0.09, 1.8, 0.024), M('#ffffff'), posts.length);
+  const postBrown = new THREE.Color('#a9794a'), postGrey = new THREE.Color('#857f76');
+  posts.forEach(([x, z, r, ours], i) => { dummy.position.set(x, fg(x, ours) + 0.9, z); dummy.rotation.set(0, r, 0); dummy.updateMatrix(); pm.setMatrixAt(i, dummy.matrix); pm.setColorAt(i, ours ? postGrey : postBrown); });
+  groups.site.add(pm);
+  // Querlattung: Nachbarzaun 2 Latten zwischen den Brettlagen; Westzaun 3 Latten ganz an der Außenseite
+  // in Stücken von max. 2 m, damit die Latten dem Gelände folgen
+  rails.forEach(({ a, ux, uz, ang: r, L, ours, ox, oz }) => {
+    const matR = M(ours ? '#857f76' : '#a9794a'), off = ours ? 0.057 : 0, n = Math.max(1, Math.ceil(L / 2));
+    for (let k = 0; k < n; k++) {
+      const s = (k + 0.5) * L / n, x = a[0] + ux * s, z = a[1] + uz * s;
+      (ours ? [0.2, 0.8, 1.4] : [0.25, 1.45]).forEach(h => {
+        const m = addMesh(new THREE.BoxGeometry(L / n + 0.01, 0.08, ours ? 0.04 : 0.024), matR, groups.site, { shadow: ours });
+        m.position.set(x + ox * off, fg(x, ours) + 0.15 + h, z + oz * off); m.rotation.y = r;
+      });
+    }
+  });
+  // Schrägstützen mit Bodenanker
+  const braceMat = M('#8a847b', { roughness: 0.9 }), anchorMat = M('#55595d', { metalness: 0.4, roughness: 0.5 });
+  braces.forEach(({ top, foot }) => {
+    const A = new THREE.Vector3(...top), B = new THREE.Vector3(...foot);
+    const m = addMesh(new THREE.BoxGeometry(0.07, A.distanceTo(B), 0.07), braceMat, groups.site);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), A.clone().sub(B).normalize());
+    const an = addMesh(new THREE.BoxGeometry(0.12, 0.1, 0.12), anchorMat, groups.site, { shadow: false });
+    an.position.set(B.x, fg(B.x, true) + 0.03, B.z);
+  });
+}
+
+/* Zäunchen aus stehendem Schwemmholz, ca. 1 m hoch: beginnt am ersten Steher des Lärchenzauns
+   und läuft mit ca. 50 cm Abstand zum Bankett gebogen der Straße entlang, ca. 11 m. */
+{
+  const C = [508, 378];                                   // Hausmitte, zeigt ins Grundstück
+  const edge = SITE.own.slice(1, 10);                     // Nordwestspitz … entlang der Straße
+  const off = edge.map((p, i) => {
+    const a = edge[Math.max(0, i - 1)], b = edge[Math.min(edge.length - 1, i + 1)];
+    const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty);
+    let nx = -ty / tl, ny = tx / tl;
+    if (nx * (C[0] - p[0]) + ny * (C[1] - p[1]) < 0) { nx = -nx; ny = -ny; }
+    return [p[0] + nx * 50, p[1] + ny * 50];
+  });
+  const start = [241 + SITE_SHIFT_X, 1757 + SITE_SHIFT_Y];
+  // erster Punkt der Linie, der vom Zaunsteher aus „vorwärts“ entlang der Straße liegt
+  let k = 0; while (k < off.length - 1 && Math.hypot(off[k][0] - start[0], off[k][1] - start[1]) < 60) k++;
+  const path = [start, ...off.slice(k)];
+  const pts = [];                                          // Punkte alle ~8 cm bis 11 m
+  let left = 1100;
+  for (let i = 0; i < path.length - 1 && left > 0; i++) {
+    const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    for (let s = 0; s < Math.min(L, left); s += 8) pts.push([a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L, (b[0] - a[0]) / L, (b[1] - a[1]) / L]);
+    left -= L;
+  }
+  const woodCols = ['#b9b2a6', '#a39a8d', '#cdc6b9', '#958c80', '#c2b8a8', '#ada392'].map(c => new THREE.Color(c));
+  const geo = new THREE.CylinderGeometry(1, 1.15, 1, 7);
+  const im = new THREE.InstancedMesh(geo, M('#ffffff', { roughness: 0.95, flatShading: true }), pts.length);
+  const d = new THREE.Object3D();
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  pts.forEach(([x, y, ux, uy], i) => {
+    const r = 0.025 + rnd() * 0.035, h = 0.85 + rnd() * 0.3 + (x > -159 ? 0.17 : 0), j = (rnd() - 0.5) * 4;
+    d.position.set(X(x - uy * j), GN + h / 2 - 0.03, Z(y + ux * j));
+    d.rotation.set((rnd() - 0.5) * 0.12, rnd() * 3, (rnd() - 0.5) * 0.12);
+    d.scale.set(r, h, r * (0.8 + rnd() * 0.3));
+    d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, woodCols[Math.floor(rnd() * woodCols.length)]);
+  });
+  im.castShadow = im.receiveShadow = true; groups.site.add(im);
+  // Trägergerüst innen (zum Grundstück hin): 5 Steher, Querlattung oben und unten entlang der Biegung
+  const frameWood = M('#8f7556', { roughness: 0.85 });
+  const inner = pts.map(([x, y, ux, uy]) => {
+    let nx = -uy, ny = ux;
+    if (nx * (C[0] - x) + ny * (C[1] - y) < 0) { nx = -nx; ny = -ny; }
+    return [x + nx * 9, y + ny * 9];
+  });
+  [0, 0.25, 0.5, 0.75, 1].forEach(f => {
+    const [x, y] = inner[Math.round(f * (inner.length - 1))];
+    box(x - 4, x + 4, y - 4, y + 4, GN, (x > -159 ? STRIP : GN) + 1.0, frameWood, groups.site);
+  });
+  for (const h of [GN + 0.23, GN + 0.83]) {
+    for (let i = 0; i < inner.length - 1; i += 3) {
+      const a = inner[i], b = inner[Math.min(i + 3, inner.length - 1)];
+      const dx = (b[0] - a[0]) / 100, dz = (b[1] - a[1]) / 100, L = Math.hypot(dx, dz);
+      if (L < 0.01) continue;
+      const m = addMesh(new THREE.BoxGeometry(L + 0.02, 0.07, 0.035), frameWood, groups.site, { shadow: false });
+      m.position.set(X((a[0] + b[0]) / 2), h, Z((a[1] + b[1]) / 2)); m.rotation.y = -Math.atan2(dz, dx);
+    }
+  }
+  // Kollision in kurzen Stücken
+  for (let i = 0; i < pts.length; i += 6) {
+    const c = addMesh(new THREE.BoxGeometry(0.5, 1.0, 0.5), mat.rail, groups.site, { collide: true, shadow: false });
+    c.position.set(X(pts[i][0]), GN + 0.5, Z(pts[i][1])); c.scale.set(0.5, 1, 0.5); c.visible = false;
+  }
+}
+
+/* Mülltonnen auf dem Bankett vor dem Schwemmholzzaun, rechts an der Ecke (von der Straße aus) beim
+   Nordwestspitz: kleine schwarze (120 l), grüne, schwarze mit gelbem und schwarze mit rotem Deckel (je 240 l).
+   Griff und Räder zum Zaun, Vorderseite zur Straße. */
+{
+  const path = [SITE.own[1], SITE.own[2], SITE.own[3]];
+  const at = t => {                                        // Punkt t Meter ab dem Spitz entlang der Straßengrenze
+    let s = t * 100;
+    for (let i = 0; i < path.length - 1; i++) {
+      const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      if (s <= L || i === path.length - 2) {
+        const ux = (b[0] - a[0]) / L, uy = (b[1] - a[1]) / L;
+        let nx = uy, ny = -ux;
+        if (nx * (508 - a[0]) + ny * (378 - a[1]) > 0) { nx = -nx; ny = -ny; }   // nach außen (zur Straße)
+        return { x: a[0] + ux * s, y: a[1] + uy * s, nx, ny };
+      }
+      s -= L;
+    }
+  };
+  const blk = M('#232527', { roughness: 0.6 }), tire = M('#151617', { roughness: 0.9 }), steelB = M('#8d9399', { metalness: 0.5, roughness: 0.4 });
+  const bin = (t, w, d, h, body, lid) => {
+    const p = at(t), g = new THREE.Group();
+    // ganz an den Schwemmholzzaun (steht 50 cm innerhalb der Grenze): Schiebegriff berührt fast die Hölzer
+    const cx = p.x + p.nx * (d * 50 - 37), cy = p.y + p.ny * (d * 50 - 37);
+    g.position.set(X(cx), GN, Z(cy));
+    g.rotation.y = Math.atan2(-p.ny, p.nx);               // lokal +x = zur Straße
+    const bx = (sx, sy, sz, x, y, z, m) => { const k = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); k.position.set(x, y, z); k.castShadow = k.receiveShadow = true; g.add(k); return k; };
+    // Korpus leicht konisch (unten schmäler)
+    const geo = new THREE.BoxGeometry(d, h - 0.1, w);
+    const pos = geo.attributes.position;
+    for (let i = 0; i < pos.count; i++) if (pos.getY(i) < 0) { pos.setX(i, pos.getX(i) * 0.86); pos.setZ(i, pos.getZ(i) * 0.88); }
+    geo.computeVertexNormals();
+    const k = new THREE.Mesh(geo, body); k.position.set(0, 0.06 + (h - 0.1) / 2, 0); k.castShadow = k.receiveShadow = true; g.add(k);
+    bx(d + 0.05, 0.05, w + 0.03, 0.01, h - 0.015, 0, lid);                 // Deckel
+    bx(0.04, 0.03, w * 0.6, d / 2 + 0.03, h - 0.03, 0, lid);               // Griffleiste vorne am Deckel
+    bx(0.06, 0.12, w - 0.04, d / 2 - 0.02, h - 0.14, 0, body);             // Kragen vorne
+    const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, w - 0.06, 8), steelB); bar.rotation.x = Math.PI / 2; bar.position.set(-d / 2 - 0.04, h - 0.1, 0); g.add(bar);   // Schiebegriff hinten
+    [-1, 1].forEach(sz => { const wh = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 16), tire); wh.rotation.x = Math.PI / 2; wh.position.set(-d / 2 + 0.03, 0.1, sz * (w / 2 - 0.03)); wh.castShadow = true; g.add(wh); });
+    groups.site.add(g);
+    const c = addMesh(new THREE.BoxGeometry(d, h, w), mat.rail, g, { collide: true, shadow: false }); c.position.y = h / 2; c.visible = false;
+  };
+  bin(0.9, 0.48, 0.55, 0.93, blk, blk);                                          // klein schwarz (Restmüll 120 l)
+  bin(1.52, 0.58, 0.73, 1.07, M('#2f7d3a', { roughness: 0.55 }), M('#2a7034', { roughness: 0.55 }));   // grün (Bio)
+  bin(2.19, 0.58, 0.73, 1.07, blk, M('#f2c318', { roughness: 0.5 }));            // gelber Deckel (Plastik/Verpackung)
+  bin(2.86, 0.58, 0.73, 1.07, blk, M('#c8231d', { roughness: 0.5 }));            // roter Deckel (Altpapier)
+}
+
+/* Luft-Wärmepumpe (Außeneinheit, ca. 110 × 77 × 45 cm) an der Hausecke westlich der Haustür,
+   auf dem Beton der schmalen Terrasse an deren Außenseite, bündig mit der Hausfront (x −9).
+   Der Ventilator zeigt nach Norden (Plan-Westen, zur Straße). */
+{
+  const x0 = -159, x1 = -114, y0 = 656, y1 = 766, base = STRIP;   // bündig mit Betonkante (Norden) und Hauswand-Flucht (Westseite), auf dem Beton
+  const hpGrey = M('#d5d8da', { roughness: 0.5 }), hpDark = M('#2b2e31', { roughness: 0.6 }), steelG = M('#9aa0a6', { metalness: 0.4, roughness: 0.4 });
+  box(x0, x1, y0 + 8, y0 + 14, base, base + 0.12, hpDark, groups.site);                          // Standfüße
+  box(x0, x1, y1 - 14, y1 - 8, base, base + 0.12, hpDark, groups.site);
+  box(x0, x1, y0, y1, base + 0.12, base + 0.12 + 0.765, hpGrey, groups.site, { collide: true }); // Gehäuse
+  box(x0, x1, y0, y1, base + 0.86, base + 0.885, M('#f4f4f1', { roughness: 0.45 }), groups.site); // Deckel weiß
+  const fy = y0 + 42, fh = base + 0.12 + 0.39;
+  const fan = addMesh(new THREE.CylinderGeometry(0.27, 0.27, 0.012, 32), hpDark, groups.site, { shadow: false });
+  fan.rotation.z = Math.PI / 2; fan.position.set(X(x0) - 0.006, fh, Z(fy));
+  const ring = addMesh(new THREE.TorusGeometry(0.27, 0.012, 8, 40), steelG, groups.site, { shadow: false });
+  ring.rotation.y = Math.PI / 2; ring.position.set(X(x0) - 0.014, fh, Z(fy));
+  for (let i = -2; i <= 2; i++) { const bar = addMesh(new THREE.BoxGeometry(0.008, 0.008, 0.54), steelG, groups.site, { shadow: false }); bar.position.set(X(x0) - 0.016, fh + i * 0.1, Z(fy)); }
+}
+
+/* Pflastersteine: ab dem Nordost-Spitz genau 10 m entlang der Straßengrenze, nur als ca. 10 cm breite
+   Begrenzung direkt an der Grenze. Der frühere Bankettstreifen ist auf dieser Länge asphaltiert. */
+{
+  const T = SITE.own[9], N = SITE.own[8];                 // Spitz und nächster Punkt der Straßengrenze
+  const dx = N[0] - T[0], dy = N[1] - T[1], L0 = Math.hypot(dx, dy), ux = dx / L0, uy = dy / L0;
+  let nx = -uy, ny = ux;                                  // Normale Richtung Straße (weg vom Haus)
+  if (nx * (508 - T[0]) + ny * (378 - T[1]) > 0) { nx = -nx; ny = -ny; }
+  const L = 1000, W = 10;
+  const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+  const g = c.getContext('2d');
+  g.fillStyle = '#6f6b66'; g.fillRect(0, 0, 256, 128);
+  for (let r = 0; r < 4; r++) for (let k = -1; k < 5; k++) {
+    const x = k * 64 + (r % 2) * 32, y = r * 32, v = 135 + Math.floor(Math.random() * 35);
+    g.fillStyle = `rgb(${v},${v - 3},${v - 8})`; g.fillRect(x + 2, y + 2, 60, 28);
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(L / 80, W / 40);                         // Steine ca. 20 × 10 cm
+  // stärkerer Tiefen-Versatz als Straße/Bankett/Schotter, sonst werden die Streifen von diesen überdeckt
+  const over = { polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8 };
+  const m = addMesh(new THREE.BoxGeometry(L / 100, 0.03, W / 100), M('#ffffff', { map: tex, roughness: 0.9, ...over }), groups.site, { walk: true, shadow: false });
+  const cx = T[0] + ux * L / 2 + nx * W / 2, cy = T[1] + uy * L / 2 + ny * W / 2;
+  m.position.set(X(cx), GN + 0.01, Z(cy)); m.rotation.y = -Math.atan2(uy, ux);
+  // Der Asphalt bis an die Begrenzung ist Teil der Straßenfläche (siehe Straßenparzelle 996/1).
+}
+
+/* Getigerter Kater auf der Bank: sitzt aufrecht, Blick in den Garten (Plan +y), Schwanz um die Pfoten gelegt. */
+{
+  const tabby = (vertical) => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#9a8264'; g.fillRect(0, 0, 256, 128);
+    for (let i = 0; i < 900; i++) { const v = 110 + Math.random() * 50; g.fillStyle = `rgba(${v + 30},${v + 15},${v - 10},0.35)`; g.fillRect(Math.random() * 256, Math.random() * 128, 2, 3); }
+    g.strokeStyle = 'rgba(52,40,28,0.85)'; g.lineCap = 'round';
+    for (let k = 0; k < 22; k++) {                            // dunkle Tigerstreifen, fein und leicht gewellt
+      g.lineWidth = 2.5 + Math.random() * 3; g.beginPath();
+      for (let s = 0; s <= 1.0001; s += 0.1) {
+        const a = (k + 0.5) / 22, w = Math.sin(s * 9 + k) * 0.012;
+        vertical ? (s === 0 ? g.moveTo : g.lineTo).call(g, (a + w) * 256, s * 128) : (s === 0 ? g.moveTo : g.lineTo).call(g, s * 256, (a + w) * 128);
+      }
+      g.stroke();
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  };
+  // dreifarbig (Glückskatze): weiß mit roten und schwarzen Flecken
+  const calico = () => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 128;
+    const g = c.getContext('2d');
+    g.fillStyle = '#f2ede4'; g.fillRect(0, 0, 256, 128);
+    const blob = (x, y, r, col) => { g.fillStyle = col; g.beginPath(); for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2, rr = r * (0.7 + Math.random() * 0.45); g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr * 0.8); } g.fill(); };
+    // große rote und schwarze Flächen, nur noch wenig Weiß (v. a. Brust, Pfoten, Schnauze sind eigene helle Teile)
+    [[20, 35, 40], [115, 25, 42], [205, 60, 42], [75, 100, 36], [160, 105, 34], [250, 110, 30], [0, 110, 30]].forEach(([x, y, r]) => blob(x, y, r, '#cf7629'));
+    [[65, 40, 32], [160, 40, 30], [240, 20, 26], [120, 85, 28], [30, 85, 24], [205, 115, 22]].forEach(([x, y, r]) => blob(x, y, r, '#1d1a18'));
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; return t;
+  };
+  const makeCat = (furTex, tailTex, lightCol, eyeCol, lying = false) => {
+  const fur = M('#ffffff', { map: furTex, roughness: 0.95 }), furTail = M('#ffffff', { map: tailTex, roughness: 0.95 });
+  const light = M(lightCol, { roughness: 0.95 }), pink = M('#c98a86', { roughness: 0.8 }), eyeM = M(eyeCol, { roughness: 0.3, emissive: '#2a2a08', emissiveIntensity: 0.4 }), dark = M('#151515');
+  const cat = new THREE.Group();
+  const part = (geo, m, x, y, z, sx = 1, sy = 1, sz = 1) => { const k = new THREE.Mesh(geo, m); k.position.set(x, y, z); k.scale.set(sx, sy, sz); k.castShadow = true; cat.add(k); return k; };
+  const sph = new THREE.SphereGeometry(1, 20, 14);
+  if (lying) {                                                // liegend (Sphinx-Haltung), Kopf erhoben, Pfoten nach vorne
+    part(sph, fur, -0.02, 0.085, 0, 0.22, 0.085, 0.11);       // Rumpf
+    part(sph, fur, -0.15, 0.085, 0.025, 0.1, 0.08, 0.1);      // Hinterteil
+    part(sph, light, 0.14, 0.075, 0, 0.06, 0.055, 0.075);     // helle Brust
+    part(sph, fur, 0.2, 0.17, 0, 0.068, 0.062, 0.072);        // Kopf
+    part(sph, light, 0.258, 0.155, 0, 0.03, 0.025, 0.035);    // Schnauze
+    part(sph, pink, 0.286, 0.165, 0, 0.008, 0.006, 0.01);     // Nase
+    [-1, 1].forEach(s => {
+      part(sph, eyeM, 0.255, 0.185, s * 0.028, 0.012, 0.012, 0.012);
+      part(sph, dark, 0.265, 0.185, s * 0.028, 0.004, 0.009, 0.004);
+      const ear = part(new THREE.ConeGeometry(0.026, 0.055, 4), fur, 0.19, 0.24, s * 0.042); ear.rotation.x = s * 0.25;
+      const leg = part(new THREE.CylinderGeometry(0.017, 0.017, 0.13, 8), fur, 0.21, 0.02, s * 0.04); leg.rotation.z = Math.PI / 2;
+      part(sph, light, 0.28, 0.018, s * 0.04, 0.025, 0.015, 0.022);   // Pfoten
+    });
+    const tl = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.018, 8, 24, Math.PI * 0.8), furTail);
+    tl.rotation.x = Math.PI / 2; tl.rotation.z = Math.PI * 0.55; tl.position.set(-0.08, 0.02, -0.02); tl.castShadow = true; cat.add(tl);   // Schwanz seitlich am Körper
+    groups.site.add(cat);
+    return cat;
+  }
+  part(sph, fur, -0.04, 0.10, 0, 0.13, 0.11, 0.12);           // Hinterteil
+  part(sph, fur, 0.02, 0.21, 0, 0.09, 0.15, 0.085);           // Brust/Rumpf aufrecht
+  part(sph, light, 0.08, 0.2, 0, 0.035, 0.09, 0.055);         // helle Brust
+  part(sph, fur, 0.05, 0.37, 0, 0.068, 0.062, 0.072);         // Kopf
+  part(sph, light, 0.11, 0.355, 0, 0.03, 0.025, 0.035);       // Schnauze
+  part(sph, pink, 0.138, 0.365, 0, 0.008, 0.006, 0.01);       // Nase
+  [-1, 1].forEach(s => {
+    part(sph, eyeM, 0.107, 0.385, s * 0.028, 0.012, 0.012, 0.012);                    // Augen
+    part(sph, dark, 0.117, 0.385, s * 0.028, 0.004, 0.009, 0.004);                    // Pupillen
+    const ear = part(new THREE.ConeGeometry(0.026, 0.055, 4), fur, 0.04, 0.44, s * 0.042);   // Ohren
+    ear.rotation.x = s * 0.25;
+    part(new THREE.CylinderGeometry(0.016, 0.018, 0.13, 8), fur, 0.075, 0.065, s * 0.035);  // Vorderbeine
+    part(sph, light, 0.09, 0.01, s * 0.035, 0.028, 0.012, 0.02);                           // Pfoten
+    part(sph, fur, -0.02, 0.06, s * 0.095, 0.09, 0.06, 0.035);                             // Hinterschenkel
+  });
+  // Schwanz: Bogen um die Vorderpfoten
+  const tail = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.018, 8, 24, Math.PI * 1.15), furTail);
+  tail.rotation.x = Math.PI / 2; tail.rotation.z = -0.35; tail.position.set(0.0, 0.018, 0.0); tail.castShadow = true; cat.add(tail);
+  groups.site.add(cat);
+  return cat;
+  };
+  // getigerter Kater liegt der Länge nach auf der Bank, Kopf zur Straße
+  /* Katzen, feiner modelliert: weiches Fell mit Schimmer, Wangen und Schnurrhaarpolster, Augen mit Lidrand,
+     Schlitzpupille und Lichtpunkt, Ohren mit rosa Innenseite, Schnurrhaare und ein sich verjüngender Schwanz. */
+  const makeCat2 = (furTex, tailTex, lightCol, eyeCol, lying = false) => {
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const furM = map => new THREE.MeshPhysicalMaterial({ color: '#ffffff', map, roughness: 0.95, sheen: 0.6, sheenRoughness: 0.7, sheenColor: new THREE.Color('#fff4e6') });
+    const fur = furM(furTex), furTail = furM(tailTex);
+    const light = new THREE.MeshPhysicalMaterial({ color: lightCol, roughness: 0.95, sheen: 0.6, sheenRoughness: 0.7, sheenColor: new THREE.Color('#ffffff') });
+    const pink = M('#d4948f', { roughness: 0.6 }), innerEar = M('#e2aaa4', { roughness: 0.8, side: THREE.DoubleSide });
+    const iris = new THREE.MeshStandardMaterial({ color: eyeCol, roughness: 0.15, metalness: 0.05, emissive: eyeCol, emissiveIntensity: 0.25 });
+    const pupil = M('#0b0b0b', { roughness: 0.1 }), rim = M('#2a2420', { roughness: 0.6 });
+    const shine = new THREE.MeshBasicMaterial({ color: '#ffffff' }), whisk = M('#f6f3ec', { roughness: 0.4 });
+    const sph = new THREE.SphereGeometry(1, 32, 24), sphFur = sph.clone().rotateX(Math.PI / 2);   // Fell-Kugeln mit Polen seitlich: Streifen laufen über den Rücken
+    const cat = new THREE.Group();
+    const part = (parent, geo, m, [x, y, z], [sx, sy, sz] = [1, 1, 1], [rx, ry, rz] = [0, 0, 0], shadow = true) => {
+      const k = new THREE.Mesh(geo, m); k.position.set(x, y, z); k.scale.set(sx, sy, sz); k.rotation.set(rx, ry, rz);
+      k.castShadow = shadow; k.receiveShadow = true; parent.add(k); return k;
+    };
+    const blob = (parent, m, p, s, r) => part(parent, m === fur || m === furTail ? sphFur : sph, m, p, s, r);
+    // sich verjüngendes Rohr von a nach b (dünnes Ende bei b)
+    const strand = (parent, a, b, r0, r1, m, seg = 8, shadow = true) => {
+      const A = V(...a), B = V(...b);
+      const k = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, A.distanceTo(B), seg), m);
+      k.position.copy(A).add(B).multiplyScalar(0.5);
+      k.quaternion.setFromUnitVectors(V(0, 1, 0), B.clone().sub(A).normalize());
+      k.castShadow = shadow; k.receiveShadow = true; parent.add(k); return k;
+    };
+    // Schwanz als Rohr entlang einer Kurve, zur Spitze dünner, runde Spitze
+    const tail = (pts, r0, r1) => {
+      const curve = new THREE.CatmullRomCurve3(pts.map(p => V(...p)));
+      const S = 48, R = 12, geo = new THREE.TubeGeometry(curve, S, 1, R, false), pos = geo.attributes.position;
+      const c = new THREE.Vector3(), v = new THREE.Vector3();
+      for (let i = 0; i <= S; i++) {
+        curve.getPointAt(i / S, c);
+        const r = r0 + (r1 - r0) * Math.pow(i / S, 1.3);
+        for (let j = 0; j <= R; j++) { const k = i * (R + 1) + j; v.fromBufferAttribute(pos, k).sub(c).multiplyScalar(r).add(c); pos.setXYZ(k, v.x, v.y, v.z); }
+      }
+      geo.computeVertexNormals();
+      const m = new THREE.Mesh(geo, furTail); m.castShadow = true; m.receiveShadow = true; cat.add(m);
+      blob(cat, furTail, pts[pts.length - 1], [r1, r1, r1]);
+    };
+    // Kopf: lokal +x = Blickrichtung
+    const head = (x, y, z, tilt = 0, turn = 0) => {
+      const h = new THREE.Group(); h.position.set(x, y, z); h.rotation.set(0, turn, tilt); cat.add(h);
+      part(h, sph, fur, [0, 0, 0], [0.062, 0.056, 0.068]);                                   // Schädel
+      part(h, sph, fur, [0.012, -0.02, 0], [0.05, 0.042, 0.072]);                            // breite Wangen
+      part(h, sph, fur, [0.04, 0.004, 0], [0.032, 0.022, 0.022]);                            // Nasenrücken
+      blob(h, light, [0.046, -0.036, 0], [0.018, 0.012, 0.017]);                        // Kinn
+      blob(h, pink, [0.072, -0.008, 0], [0.008, 0.007, 0.011], [0, 0, 0.3]);            // Nase
+      [-1, 1].forEach(s => {
+        blob(h, light, [0.054, -0.021, s * 0.014], [0.021, 0.017, 0.02]);               // Schnurrhaarpolster
+        // Auge: dunkler Lidrand, Iris, Schlitzpupille, Lichtpunkt
+        const e = new THREE.Group(); e.position.set(0.05, 0.014, s * 0.027); e.rotation.set(0, -s * 0.45, 0); h.add(e);
+        part(e, sph, rim, [-0.001, 0, 0], [0.0075, 0.0125, 0.0165]);
+        part(e, sph, iris, [0, 0, 0], [0.0075, 0.0115, 0.0155]);
+        part(e, sph, pupil, [0.0045, 0, 0], [0.0035, 0.0095, 0.0035], [0, 0, 0], false);
+        part(e, sph, shine, [0.0068, 0.004, -s * 0.004], [0.0022, 0.0022, 0.0022], [0, 0, 0], false);
+        // Ohr: flacher Kegel, rosa Innenseite
+        const ear = new THREE.Group(); ear.position.set(-0.008, 0.045, s * 0.036); ear.rotation.set(s * 0.38, 0, -0.12); h.add(ear);
+        part(ear, new THREE.ConeGeometry(0.03, 0.06, 20), fur, [0, 0.025, 0], [0.42, 1, 1]);
+        const tg = new THREE.ShapeGeometry(new THREE.Shape([new THREE.Vector2(-0.015, 0), new THREE.Vector2(0.015, 0), new THREE.Vector2(0, 0.043)]));
+        tg.rotateY(Math.PI / 2);
+        part(ear, tg, innerEar, [0.0128, 0, 0], [1, 1, 1], [0, 0, 0.207], false);
+        // Schnurrhaare: drei je Seite, fächerförmig, dazu zwei Tasthaare über dem Auge
+        for (let k = 0; k < 3; k++) strand(h, [0.06, -0.018 - k * 0.004, s * 0.026], [0.085 - k * 0.012, -0.006 - k * 0.016, s * (0.13 - k * 0.008)], 0.0016, 0.0005, whisk, 5, false);
+        strand(h, [0.048, 0.03, s * 0.03], [0.056, 0.05, s * 0.048], 0.0011, 0.0004, whisk, 5, false);
+      });
+      return h;
+    };
+    if (!lying) {                                                                         // sitzend
+      blob(cat, fur, [-0.045, 0.1, 0], [0.12, 0.1, 0.12]);                               // Hinterteil
+      [-1, 1].forEach(s => blob(cat, fur, [-0.03, 0.075, s * 0.085], [0.09, 0.075, 0.045], [0, 0, 0.35]));   // Oberschenkel
+      blob(cat, fur, [0.0, 0.2, 0], [0.085, 0.15, 0.082], [0, 0, -0.22]);                // Rumpf aufrecht
+      blob(cat, light, [0.058, 0.215, 0], [0.042, 0.105, 0.058], [0, 0, -0.2]);          // helle Brust
+      blob(cat, fur, [0.035, 0.31, 0], [0.058, 0.06, 0.062]);                            // Nacken
+      head(0.055, 0.375, 0, 0.06);
+      [-1, 1].forEach(s => {
+        strand(cat, [0.06, 0.2, s * 0.034], [0.078, 0.02, s * 0.034], 0.02, 0.015, fur, 12);   // Vorderbeine
+        blob(cat, light, [0.088, 0.013, s * 0.034], [0.03, 0.014, 0.021]);               // Vorderpfoten
+        blob(cat, light, [0.03, 0.012, s * 0.112], [0.034, 0.013, 0.02], [0, -s * 0.3, 0]);   // Hinterpfoten
+      });
+      tail([[-0.14, 0.06, -0.02], [-0.16, 0.025, 0.06], [-0.08, 0.018, 0.13], [0.04, 0.017, 0.135], [0.12, 0.018, 0.08]], 0.021, 0.011);   // um die Pfoten gelegt
+    } else {                                                                              // liegend (Sphinx-Haltung)
+      blob(cat, fur, [-0.03, 0.088, 0], [0.215, 0.085, 0.105]); blob(cat, fur, [0.05, 0.115, 0], [0.13, 0.062, 0.088], [0, 0, 0.22]);   // + Rückenlinie zu den Schultern                              // Rumpf
+      [-1, 1].forEach(s => {
+        blob(cat, fur, [-0.115, 0.078, s * 0.05], [0.135, 0.07, 0.06], [0, s * 0.12, 0]);                  // eingeschlagene Hinterbeine
+        blob(cat, fur, [0.085, 0.075, s * 0.048], [0.095, 0.062, 0.055]);                    // Schultern
+        strand(cat, [0.11, 0.03, s * 0.045], [0.24, 0.022, s * 0.045], 0.018, 0.015, fur, 12);   // Vorderbeine nach vorn
+        blob(cat, light, [0.255, 0.016, s * 0.045], [0.027, 0.015, 0.022]);               // Vorderpfoten
+        blob(cat, light, [-0.06, 0.014, s * 0.1], [0.034, 0.013, 0.019]);              // Hinterpfoten
+      });
+      blob(cat, light, [0.135, 0.08, 0], [0.07, 0.07, 0.072]);                           // Brust
+      blob(cat, fur, [0.16, 0.14, 0], [0.085, 0.052, 0.058], [0, 0, 0.85]);              // Nacken
+      head(0.205, 0.185, 0, 0.0);
+      tail([[-0.2, 0.06, 0], [-0.24, 0.03, -0.06], [-0.16, 0.02, -0.12], [-0.03, 0.018, -0.13], [0.07, 0.018, -0.1]], 0.02, 0.011);   // seitlich am Körper
+    }
+    // Fell durchgehend mustern: seitliche Projektion im Katzen-Koordinatensystem, damit Streifen und Flecken
+    // ohne Nähte über Rumpf, Beine und Hals laufen (der Kopf behält seine eigene Zeichnung)
+    const v3 = new THREE.Vector3();
+    cat.children.forEach(k => {
+      if (!k.isMesh || k.material !== fur) return;
+      k.updateMatrix();
+      const g = k.geometry.clone(), p = g.attributes.position, uv = new Float32Array(p.count * 2);
+      for (let i = 0; i < p.count; i++) { v3.fromBufferAttribute(p, i).applyMatrix4(k.matrix); uv[2 * i] = v3.x * 1.8 + 0.3; uv[2 * i + 1] = v3.y * 2; }
+      g.setAttribute('uv', new THREE.BufferAttribute(uv, 2)); k.geometry = g;
+    });
+    groups.site.add(cat);
+    return cat;
+  };
+  const kater = makeCat2(tabby(true), tabby(false), '#d9c6a6', '#8fae3a', true);
+  kater.position.set(X(120), STRIP + 0.45, Z(812)); kater.rotation.y = Math.PI - 0.15;
+  // dreifarbige Katze auf der unteren Stufe der Eingangsstiege (seitlich, Weg zur Tür bleibt frei), Blick zur Straße
+  const ct = calico();
+  const katze = makeCat2(ct, ct, '#f2ede4', '#c9a23a');
+  katze.position.set(X(-52), STRIP + 0.15, Z(360)); katze.rotation.y = Math.PI - 0.3; katze.scale.setScalar(0.92);
+}
+
+/* Holzbank beim westlichen Fallrohr, an der Hauswand auf dem Betonstreifen: 160 cm breit,
+   Sitzfläche aus 6 Kanthölzern 5 × 5 cm mit 5 cm Abstand, Lehne ein 17 cm breites Brett. */
+{
+  const bw = M('#958f85', { roughness: 0.9 });   // vergraut
+  const x0 = 25, x1 = 185, base = STRIP, seat = base + 0.45;
+  // 6 Sitzlatten 5 × 5 mit 4 cm Abstand → Sitztiefe 50 cm
+  for (let i = 0; i < 6; i++) box(x0, x1, 785 + i * 9, 790 + i * 9, seat - 0.05, seat, bw, groups.site);   // Sitzlatten
+  for (const x of [x0 + 8, x1 - 13]) {
+    box(x, x + 5, 827, 835, base, seat - 0.05, bw, groups.site);                // Vorderbein
+    box(x, x + 5, 781, 788, base, base + 0.80, bw, groups.site);                // Hinterbein bis zur Lehne
+    box(x, x + 5, 781, 835, seat - 0.12, seat - 0.05, bw, groups.site);         // Querholz unter der Sitzfläche
+  }
+  box(x0, x1, 788, 790.4, base + 0.61, base + 0.78, bw, groups.site);           // Lehne: Brett 17 cm, vor den Stehern
+  // Brandprägung auf der Lehne: „80% is enough“ mit einem zu 80 % gefüllten Balken
+  {
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 128;
+    const g = c.getContext('2d');
+    const burn = '#2e1a0c';
+    g.shadowColor = 'rgba(70,35,10,0.55)'; g.shadowBlur = 6;
+    g.fillStyle = burn; g.strokeStyle = burn;
+    g.font = 'italic 700 74px Georgia, "Times New Roman", serif';
+    g.textBaseline = 'middle';
+    const txt = '80% is enough';
+    g.fillText(txt, 40, 66);
+    const tw = g.measureText(txt).width;
+    // Balken rechts: Rahmen, 80 % gefüllt mit Schraffur, 20 % leer
+    const bx = 40 + tw + 46, bw2 = 1024 - bx - 50, by = 40, bh = 52;
+    g.lineWidth = 6; g.strokeRect(bx, by, bw2, bh);
+    g.fillRect(bx + bw2 + 4, by + 14, 10, bh - 28);                         // „Batteriepol“
+    g.save(); g.beginPath(); g.rect(bx + 9, by + 9, (bw2 - 18) * 0.8, bh - 18); g.clip();
+    for (let x = bx - bh; x < bx + bw2; x += 12) { g.beginPath(); g.moveTo(x, by + bh); g.lineTo(x + bh, by); g.lineWidth = 5; g.stroke(); }
+    g.restore();
+    g.shadowBlur = 0; g.lineWidth = 2;
+    g.beginPath(); g.moveTo(bx + 9 + (bw2 - 18) * 0.8 + 3, by + 6); g.lineTo(bx + 9 + (bw2 - 18) * 0.8 + 3, by + bh - 6); g.stroke();
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+    const plate = addMesh(new THREE.PlaneGeometry(1.3 / 3, 0.13 / 3), new THREE.MeshStandardMaterial({ map: t, transparent: true, roughness: 0.9, polygonOffset: true, polygonOffsetFactor: -2 }), groups.site, { shadow: false });
+    plate.position.set(X(x1 - 3) - 1.3 / 6, base + 0.61 + 0.012 + 0.13 / 6, Z(790.4) + 0.002);   // rechte untere Ecke der Lehne
+  }
+  box(x0, x1, 781, 835, base, seat, bw, groups.site, { collide: true }).visible = false;
+}
+
+// Betonflächen: schmale Terrasse 1,5 m von der Haustür ums Eck bis zur Terrasse
+const concrete = M('#bdbab3', { roughness: 0.95 });
+// Schotterfugen mit sichtbarer Kiesstruktur (Textur 50 × 50 cm, pro Fläche passend wiederholt)
+const kiesTex = (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#8f887c'; g.fillRect(0, 0, 256, 256);
+  let s = 3; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 1400; i++) {
+    const x = r() * 256, y = r() * 256, rad = 3 + r() * 6, v = 110 + Math.floor(r() * 120), warm = Math.floor(r() * 18);
+    g.fillStyle = 'rgba(40,36,30,0.55)';
+    g.beginPath(); g.ellipse(x + 1.5, y + 2, rad, rad * 0.75, r() * 3, 0, 7); g.fill();               // Schatten
+    g.fillStyle = `rgb(${v + warm},${v + warm / 2},${v - 6})`;
+    g.beginPath(); g.ellipse(x, y, rad, rad * (0.6 + r() * 0.35), r() * 3, 0, 7); g.fill();
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.beginPath(); g.ellipse(x - rad * 0.3, y - rad * 0.3, rad * 0.35, rad * 0.25, 0, 0, 7); g.fill(); // Glanzlicht
+  }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8;
+  return t;
+})();
+function kiesBox(x0, x1, y0, y1, h0, h1) {
+  const t = kiesTex.clone(); t.needsUpdate = true; t.repeat.set(Math.abs(x1 - x0) / 50, Math.abs(y1 - y0) / 50);
+  return box(x0, x1, y0, y1, h0, h1, M('#ffffff', { map: t, roughness: 1 }), groups.site, { walk: true, shadow: false });
+}
+// schmaler Streifen mit 25 cm Schotterfuge zur Hauswand
+box(-159, -34, 240, 916, -0.65, STRIP, concrete, groups.site, { walk: true });
+box(-34, 617, 791, 916, -0.65, STRIP, concrete, groups.site, { walk: true });
+kiesBox(-34, -9, 240, 791, -0.65, STRIP - 0.03);
+kiesBox(-9, 617, 766, 791, -0.65, STRIP - 0.03);
+// selbstgemachte Holzstiege mit 2 Stufen zur Haustür: vom Streifen (−0,30) in 2 × 15 cm bis auf Schwellenhöhe
+{
+  const sw = M('#9b7652', { roughness: 0.85 }), y0 = 248, y1 = 378, r = -STRIP / 2;
+  box(-65, -9, y0, y1, STRIP, STRIP + r, sw, groups.site, { walk: true });          // untere Stufe
+  box(-37, -9, y0, y1, STRIP + r, -0.002, sw, groups.site, { walk: true });         // obere Stufe auf Höhe der Haustür
+  for (const y of [y0, y1 - 4]) box(-65, -9, y, y + 4, STRIP, 0.003, M('#86643f'), groups.site);   // Wangen
+}
+
+// Container Nord mit Balkon darauf (Dielen OK +2,96 = FFBOK OG, eben aus der Balkontür)
+// grüner Container unter dem Balkon, Tür an der Ostseite mit kleinem Vordach
+{
+  const green = M('#6f9a5c', { roughness: 0.7 }), greenDark = M('#5d864d', { roughness: 0.7 });
+  // 30 cm Spalt zwischen Hauswand (y −9) und Container
+  // Ostende bündig mit der Hausfront mit dem großen Fenster ② (x 1026)
+  // Container steht auf einem ca. 40 cm hohen Sockel (braun wie der Haussockel), Standardhöhe 2,59 m
+  box(400, 1026, -330, -39, -0.65, -0.07, mat.plinth, groups.site, { collide: true });
+  box(400, 1026, -330, -39, -0.07, 2.52, green, groups.site, { collide: true });
+  // Sickenprofil an den sichtbaren Seiten
+  for (let x = 415; x < 1018; x += 28) box(x, x + 12, -333, -330, -0.02, 2.47, greenDark, groups.site, { shadow: false });
+  for (let y = -315; y < -50; y += 28) { box(1026, 1029, y, y + 12, -0.02, 2.47, greenDark, groups.site, { shadow: false }); box(397, 400, y, y + 12, -0.02, 2.47, greenDark, groups.site, { shadow: false }); }
+  // Betonblock vor der Tür, reicht bis zur Terrasse; der Steher des Vordachs steht genau an seiner Außenecke
+  box(1026, 1176, -270, -9, -0.65, -0.12, M('#bdbab3', { roughness: 0.95 }), groups.site, { walk: true });
+  box(1026, 1031, -230, -138, -0.02, 2.00, M('#f1f1ec', { roughness: 0.6 }), groups.site);   // Tür weiß
+  box(1031, 1036, -152, -146, 1.0, 1.15, M('#1b1c1e', { roughness: 0.4 }), groups.site);   // Griff schwarz
+  box(1033, 1038, -152, -133, 1.05, 1.085, M('#1b1c1e', { roughness: 0.4 }), groups.site);
+  // Das Vordach über der Tür wird beim Terrassendach gebaut (bündiger Anschluss)
+}
+// Balkon: reicht nach Westen bis zum Ende des Stiegenhausfensters ⑧ (x 400), Lärchendielen
+box(400, 1026, -330, -9, 2.52, 2.90, mat.slab, groups.site);
+box(400, 1026, -330, -9, 2.90, 2.945, M('#5e4a35'), groups.site, { walk: true, shadow: false });
+{
+  const larch = [M('#9e988e', { roughness: 0.9 }), M('#938d83', { roughness: 0.9 }), M('#a8a297', { roughness: 0.9 })];   // vergraut
+  let k = 0;
+  for (let x = 401; x < 1025; x += 14.5) box(x, Math.min(x + 13.5, 1025), -329, -10, 2.945, 2.96, larch[k++ % 3], groups.site, { shadow: false });
+}
+// Holzgeländer mit Bambus-Sichtschutz
+const bambooTex = (() => {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const g = c.getContext('2d');
+  g.fillStyle = '#6f6a62'; g.fillRect(0, 0, 512, 256);                 // vergrauter Bambus
+  for (let x = 0; x < 512; x += 11) {
+    const tone = 135 + Math.floor(Math.random() * 40);
+    g.fillStyle = `rgb(${tone + 8},${tone + 4},${tone - 6})`;
+    g.fillRect(x + 1, 0, 9, 256);
+    g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x + 3, 0, 2, 256);
+    g.fillStyle = 'rgba(70,50,20,0.55)';
+    for (let y = Math.random() * 60; y < 256; y += 55 + Math.random() * 25) g.fillRect(x + 1, y, 9, 3);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace; t.wrapS = THREE.RepeatWrapping;
+  return t;
+})();
+const railWood = M('#8d877d', { roughness: 0.9 });   // vergraut
+function woodRailing(x0, x1, y0, y1) {
+  const h0 = 2.96, h1 = 3.96, alongX = Math.abs(x1 - x0) > Math.abs(y1 - y0);
+  const len = (alongX ? x1 - x0 : y1 - y0) / 100;
+  const tex = bambooTex.clone(); tex.needsUpdate = true; tex.repeat.set(len / 1.2, 1);
+  const panel = alongX ? box(x0, x1, (y0 + y1) / 2 - 1, (y0 + y1) / 2 + 1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), groups.site, { collide: true })
+                       : box((x0 + x1) / 2 - 1, (x0 + x1) / 2 + 1, y0, y1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), groups.site, { collide: true });
+  if (!alongX) panel.rotation.y = 0;
+  box(x0 - 2, x1 + 2, y0 - 2, y1 + 2, h1 - 0.05, h1, railWood, groups.site, { collide: true });        // Handlauf
+  box(x0, x1, y0, y1, h0 + 0.03, h0 + 0.07, railWood, groups.site);                                      // Unterholm
+  const n = Math.max(1, Math.round(len / 1.2));
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, cx = x0 + (x1 - x0) * t, cy = y0 + (y1 - y0) * t;
+    box(cx - 4.5, cx + 4.5, cy - 4.5, cy + 4.5, h0, h1 - 0.05, railWood, groups.site);
+  }
+}
+const railH = [2.85, 3.80];
+const railing = (x0, x1, y0, y1, h0, h1, group) => {
+  box(x0, x1, y0, y1, h1 - 0.05, h1, mat.rail, group, { collide: true });
+  const len = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)), n = Math.floor(len / 11);
+  for (let i = 0; i <= n; i++) {
+    const t = i / n;
+    const cx = x0 + (x1 - x0) * t, cy = y0 + (y1 - y0) * t;
+    box(cx - 1.5, cx + 1.5, cy - 1.5, cy + 1.5, h0, h1 - 0.05, mat.rail, group, { shadow: false });
+  }
+  // unsichtbarer Kollisionskörper über die volle Höhe
+  const c = box(x0, x1, y0, y1, h0, h1, mat.rail, group, { collide: true });
+  c.visible = false;
+};
+woodRailing(404, 1022, -330, -326);
+woodRailing(1022, 1026, -330, -9);
+woodRailing(400, 404, -330, -9);
+
+// Terrasse (L-Form Ost/Süd) mit Überdachung
+/* Ostseite 3,50 m tief ab Hauswand, Südseite wie in den Ansichten (ohne Dach).
+   Dach nur über dem Ostteil: schwarz, 10° Gefälle von der Hauswand weg, Glasfelder über Fenster ② und Terrassentür ③. */
+// TS: Pergola reicht bis an den Rand der 3,50 m breiten West-Terrasse
+const TD = 350, TS = 350, tAng = THREE.MathUtils.degToRad(10), tTan = Math.tan(tAng), tWall = 2.95;
+const tBlack = M('#1c1d1f', { roughness: 0.5 });
+const spruce = M('#a39d92', { roughness: 0.85 });   // Pergola-Fichte, vergraut
+const tGlass = new THREE.MeshStandardMaterial({ color: '#b9d3e2', transparent: true, opacity: 0.32, roughness: 0.05, depthWrite: false });
+// Terrasse ab dort, wo sie breit wird: ebenerdig zur Terrassentür, eine Stufe (20 cm) hinunter zum Garten.
+// Der schmale Streifen von der Haustür liegt 30 cm tiefer (−0,30); am Übergang eine Holzstufe (2 × 15 cm).
+const tTop = -0.005;
+// breiter Teil der West-Terrasse (offen, ohne Dach): 3,50 m ab Hauswand
+const TW = 350;
+/* Gefälle 1,5 %: der Südteil fällt nach Süden (Plan +x), der Westteil nach Westen (Plan +y).
+   Grenze ist die Diagonale von der Hausecke (1026/766) zur äußeren Terrassenecke – wie ein Grat. */
+const terrH = (x, y) => tTop - 0.015 * Math.max(0, Math.max(x - 1026, y - 766)) / 100;
+{
+  const tLow = tTop - 0.07;
+  // 25 cm Fuge zur Hauswand: Schotter mit einem durchgehenden Holzbrett, vor der Terrassentür zwei Bretter
+  box(1051, 1026 + TD, -9, 766 + TW, -0.65, tLow, concrete, groups.site);
+  box(617, 1051, 791, 766 + TW, -0.65, tLow, concrete, groups.site);
+  kiesBox(617, 1051, 766, 791, -0.65, tTop - 0.05);
+  kiesBox(1026, 1051, -9, 766, -0.65, tTop - 0.05);
+  const brett = M('#928c83', { roughness: 0.9 });   // vergraut
+  // Bretter 20 cm breit, 5 cm Luft zur Hauswand
+  box(617, 1051, 771, 791, tTop - 0.025, tTop, brett, groups.site, { walk: true });
+  box(1031, 1051, -9, 771, tTop - 0.025, tTop, brett, groups.site, { walk: true });
+  // vor der Terrassentür: kurzes Brett zwischen Tür (Laibung) und dem durchgehenden Brett
+  box(1009, 1030, 452.5, 633.5, -0.02, 0.004, M('#9a948a', { roughness: 0.9 }), groups.site, { walk: true });
+  const pos = [], idx = [];
+  const grid = (x0, x1, y0, y1) => {
+    const nx = Math.ceil((x1 - x0) / 10), ny = Math.ceil((y1 - y0) / 10), base = pos.length / 3;
+    for (let j = 0; j <= ny; j++) for (let i = 0; i <= nx; i++) {
+      const x = x0 + (x1 - x0) * i / nx, y = y0 + (y1 - y0) * j / ny;
+      pos.push(X(x), terrH(x, y), Z(y));
+    }
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+      const a = base + j * (nx + 1) + i, b = a + 1, c = a + nx + 1, d = c + 1;
+      idx.push(a, c, b, b, c, d);
+    }
+  };
+  grid(1051, 1026 + TD, -9, 766 + TW);
+  grid(617, 1051, 791, 766 + TW);
+  // Stirnseiten von der Gefälleoberfläche hinunter auf den Unterbau
+  const skirt = (pts) => {
+    for (let k = 0; k < pts.length - 1; k++) {
+      const [ax, ay] = pts[k], [bx, by] = pts[k + 1], base = pos.length / 3;
+      pos.push(X(ax), terrH(ax, ay), Z(ay), X(bx), terrH(bx, by), Z(by), X(ax), tLow, Z(ay), X(bx), tLow, Z(by));
+      idx.push(base, base + 2, base + 1, base + 1, base + 2, base + 3, base, base + 1, base + 2, base + 1, base + 3, base + 2);
+    }
+  };
+  const line = (x0, y0, x1, y1, n = 20) => Array.from({ length: n + 1 }, (_, i) => [x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n]);
+  skirt(line(1026 + TD, -9, 1026 + TD, 766 + TW));
+  skirt(line(617, 766 + TW, 1026 + TD, 766 + TW));
+  skirt(line(617, 791, 617, 766 + TW));
+  skirt(line(1051, -9, 1026 + TD, -9));
+  skirt(line(617, 791, 1051, 791));
+  skirt(line(1051, -9, 1051, 791));
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); g.computeVertexNormals();
+  addMesh(g, concrete, groups.site, { walk: true });
+}
+// Holzstufe am Übergang vom schmalen zum breiten Teil (auf halber Höhe)
+box(587, 617, 791, 914, STRIP, (STRIP + tTop) / 2, M('#928c83', { roughness: 0.9 }), groups.site, { walk: true });
+// geneigte Platte: dir 'east' (Wand bei x0, fällt nach Osten) oder 'south' (Wand bei y0, fällt nach Süden)
+function tiltPanel(x0, x1, y0, y1, dir, top, thick, material, shadow = true) {
+  const L = (dir === 'east' ? x1 - x0 : y1 - y0) / 100, W = (dir === 'east' ? y1 - y0 : x1 - x0) / 100;
+  const geo = dir === 'east' ? new THREE.BoxGeometry(L / Math.cos(tAng), thick, W) : new THREE.BoxGeometry(W, thick, L / Math.cos(tAng));
+  const m = addMesh(geo, material, groups.roof, { shadow });
+  const cy = top - tTan * L / 2 - thick / 2;
+  if (dir === 'east') { m.position.set(X(x0) + L / 2, cy, Z((y0 + y1) / 2)); m.rotation.z = -tAng; }
+  else { m.position.set(X((x0 + x1) / 2), cy, Z(y0) + L / 2); m.rotation.x = tAng; }
+  if (material === tGlass) m.renderOrder = 2;
+  return m;
+}
+{
+  const x0 = 1026, x1 = 1026 + TD, ys = [-9, 95.5, 338.5, 452.5, 633.5, 766 + TS];
+  ys.slice(0, -1).forEach((y, i) => tiltPanel(x0, x1, y, ys[i + 1], 'east', tWall, i % 2 ? 0.02 : 0.1, i % 2 ? tGlass : tBlack, !(i % 2)));
+  // Pergola aus Fichtenholz: Sparren unter der Eindeckung, auch zwischen den Glasfeldern
+  [-9, 95.5, 172.5, 253.5, 338.5, 452.5, 543, 633.5, 760, 890, 766 + TS - 8].forEach(y => tiltPanel(x0, x1, y, y + 8, 'east', tWall - 0.1, 0.14, spruce));
+  // Wandanschluss-Verblechung: ca. 20 cm hoch direkt an der Hauswand, mit Abkantung aufs Dach
+  box(1026, 1028, -9, 766, tWall - 0.01, tWall + 0.20, tBlack, groups.roof);
+  box(1026, 1040, -9, 766, tWall - 0.02, tWall + 0.005, tBlack, groups.roof);
+  // Wandpfette und vordere Pfette
+  box(1026, 1040, -9, 766 + TS, tWall - 0.30, tWall - 0.1, spruce, groups.roof);
+  const eave = tWall - tTan * TD / 100;
+  box(x1 - 14, x1, -9, 766 + TS, eave - 0.36, eave - 0.14, spruce, groups.roof);
+  box(x1 - 2, x1 + 2, -9, 766 + TS, eave - 0.14, eave + 0.02, tBlack, groups.roof);   // schwarze Abschlussleiste
+  // Vordach vor der Containertür: bündig ans Terrassendach, gleiche Höhe und Neigung
+  const topAt = x => tWall - tTan * (x - 1026) / 100;
+  // ragt ca. 1,5 m vom Container weg
+  const vx = 1026 + 150, vEave = topAt(vx);
+  tiltPanel(1026, vx, -270, -9, 'east', topAt(1026), 0.1, tBlack);
+  tiltPanel(1026, vx, -270, -262, 'east', topAt(1026) - 0.1, 0.14, spruce);
+  tiltPanel(1026, vx, -120, -112, 'east', topAt(1026) - 0.1, 0.14, spruce);
+  box(vx - 14, vx, -270, -9, vEave - 0.32, vEave - 0.1, spruce, groups.roof);
+  box(1026, 1040, -270, -9, topAt(1026) - 0.3, topAt(1026) - 0.1, spruce, groups.roof);
+  box(vx - 12, vx, -270, -258, G, vEave - 0.32, spruce, groups.site, { collide: true });
+  // Steher aus Fichte (nur der lange Teil ist überdacht); der hinterste steht an der Hauswand,
+  // wo das Dach über die Hausecke hinausragt
+  [0, 1, 2, 3].map(i => 2 + i * (766 + TS - 8) / 3).map(y => [x1 - 7, y]).forEach(([x, y]) => box(x - 7, x + 7, y - 7, y + 7, tTop - 0.07, eave - 0.36, spruce, groups.site, { collide: true }));
+  box(1033, 1047, 766 + TS - 14, 766 + TS, tTop - 0.07, tWall - 0.3, spruce, groups.site, { collide: true });
+
+  /* Westseite zwischen den beiden Stehern: Schilfmatte ca. 1,60 m hoch, senkrechte Halme,
+     getragen von 3 Staffeln 5 × 8 cm an der Außenseite. */
+  {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 256;
+    const g = c.getContext('2d');
+    g.fillStyle = '#7d786f'; g.fillRect(0, 0, 256, 256);               // vergrautes Schilf
+    let s = 5; const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+    for (let x = 0; x < 256; x += 3 + r() * 1.5) {
+      const v = 140 + Math.floor(r() * 50);
+      g.fillStyle = `rgb(${v},${v - 4},${v - 14})`; g.fillRect(x, 0, 2.2, 256);
+      g.fillStyle = 'rgba(255,255,255,0.18)'; g.fillRect(x + 0.4, 0, 0.6, 256);
+      g.fillStyle = 'rgba(90,70,35,0.5)';
+      for (let y = r() * 60; y < 256; y += 45 + r() * 40) g.fillRect(x, y, 2.2, 1.5);   // Knoten
+    }
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    const h = 1.6, yE = 766 + TS - 7, xE = x1 - 7;
+    const reedMat = len => { const tt = t.clone(); tt.needsUpdate = true; tt.repeat.set(len / 60, 1); return M('#ffffff', { map: tt, roughness: 0.95 }); };
+    // Westseite: zwischen Steher an der Hausecke und Eck-Steher
+    {
+      const xa = 1047, xb = x1 - 14, base = terrH(xb, yE) - 0.01;
+      box(xa, xb, yE - 1.5, yE + 0.5, base, base + h, reedMat(xb - xa), groups.site, { collide: true });
+      // Staffeln außen auf die Steher geschraubt (Steher-Außenkante y 1116)
+      for (const hh of [0.15, 0.8, 1.45]) box(1033, x1 + 5, yE + 7, yE + 12, base + hh, base + hh + 0.08, spruce, groups.site);
+    }
+    // Südseite: vom Eck-Steher bis zum nächsten Steher
+    {
+      const yNext = 2 + 2 * (766 + TS - 8) / 3, ya = yNext + 7, yb = yE - 7, base = terrH(xE, yb) - 0.01;
+      box(xE - 1.5, xE + 0.5, ya, yb, base, base + h, reedMat(yb - ya), groups.site, { collide: true });
+      // Staffeln außen auf die Steher geschraubt (Steher-Außenkante x = x1)
+      for (const hh of [0.15, 0.8, 1.45]) box(x1, x1 + 5, yNext - 7, yE + 7, base + hh, base + hh + 0.08, spruce, groups.site);
+    }
+    // Stirnseite beim Container: 1,60 m hoch vom vorderen Eck-Steher Richtung Haus, 1 m zum Haus frei,
+    // dort ein zusätzlicher Steher; Staffeln außen (Richtung Container)
+    {
+      // Abschluss-Steher in einer Flucht mit dem Vordach-Steher auf dem Betonblock (x ≈ 1170)
+      const yS = 2, xp = 1170, xa = xp + 7, xb = x1 - 14, base = terrH(xb, yS) - 0.01;
+      const postTop = tWall - 0.24 - tTan * (xp - 1026) / 100;
+      box(xp - 7, xp + 7, yS - 7, yS + 7, tTop - 0.07, postTop, spruce, groups.site, { collide: true });
+      box(xa, xb, yS - 0.5, yS + 1.5, base, base + h, reedMat(xb - xa), groups.site, { collide: true });
+      for (const hh of [0.15, 0.8, 1.45]) box(xp - 7, x1, yS - 12, yS - 7, base + hh, base + hh + 0.08, spruce, groups.site);
+    }
+    // Ecke bei der Holzstufe (äußere Ecke der West-Terrasse): L-förmig je ca. 2 m, 1 m hoch
+    {
+      // Schenkel zur Stufe 2 m, Schenkel Richtung Pergola-Schilfwand 2,5 m
+      const cx0 = 617, cy0 = 766 + TW, len = 200, len2 = 250, hl = 1.0, base = terrH(cx0, cy0) - 0.01;
+      const posts = [[cx0 + 4, cy0 - 4], [cx0 + 4, cy0 - len], [cx0 + len2, cy0 - 4]];
+      posts.forEach(([x, y]) => box(x - 4.5, x + 4.5, y - 4.5, y + 4.5, base - 0.05, base + hl + 0.03, spruce, groups.site, { collide: true }));
+      box(cx0 + 3, cx0 + 5, cy0 - len + 5, cy0 - 9, base, base + hl, reedMat(len - 14), groups.site, { collide: true });   // entlang der Westkante der Stufe
+      box(cx0 + 9, cx0 + len2 - 5, cy0 - 5, cy0 - 3, base, base + hl, reedMat(len2 - 14), groups.site, { collide: true }); // entlang der Außenkante
+      for (const hh of [0.12, 0.78]) {
+        box(cx0 - 5, cx0 - 0.5, cy0 - len - 4.5, cy0 + 1, base + hh, base + hh + 0.08, spruce, groups.site);
+        box(cx0 - 5, cx0 + len2 + 4.5, cy0 + 0.5, cy0 + 5, base + hh, base + hh + 0.08, spruce, groups.site);
+      }
+      // Deckbrett oben, 8 cm breit
+      const top = base + hl + 0.03;
+      box(cx0, cx0 + 8, cy0 - len - 4.5, cy0, top, top + 0.025, spruce, groups.site);
+      box(cx0, cx0 + len2 + 4.5, cy0 - 8, cy0, top, top + 0.025, spruce, groups.site);
+    }
+    // Südseite, andere Ecke (beim Container): vom Eck-Steher bis zum nächsten Steher, 1,00 m hoch
+    {
+      const y0p = 2, y1p = 2 + (766 + TS - 8) / 3, ya = y0p + 7, yb = y1p - 7, base = terrH(xE, yb) - 0.01, hl = 1.0;
+      box(xE - 1.5, xE + 0.5, ya, yb, base, base + hl, reedMat(yb - ya), groups.site, { collide: true });
+      box(xE - 4, xE + 4, ya, yb, base + hl, base + hl + 0.025, spruce, groups.site);      // Deckbrett 8 cm
+      for (const hh of [0.12, 0.78]) box(x1, x1 + 5, y0p - 7, y1p + 7, base + hh, base + hh + 0.08, spruce, groups.site);
+    }
+  }
+}
+
+// zwei Bäume im eigenen Garten
+[[2300 + SITE_SHIFT_X, 700 + SITE_SHIFT_Y], [3200 + SITE_SHIFT_X, 1200 + SITE_SHIFT_Y]].forEach(([x, y], i) => {
+  const s = 0.9 + (i % 2) * 0.35;
+  const trunk = addMesh(new THREE.CylinderGeometry(0.12, 0.16, 2.2 * s, 8), mat.wood, groups.site);
+  trunk.position.set(X(x), G + 1.1 * s, Z(y));
+  const crown = addMesh(new THREE.IcosahedronGeometry(1.6 * s, 1), M('#5f8045', { flatShading: true }), groups.site);
+  crown.position.set(X(x), G + 2.9 * s, Z(y));
+});
+
+// Fahrrad (Ursprung am Boden, Länge entlang lokal x, Vorderrad bei +x)
+function makeBike(color) {
+  const tube = (g2, a, b, r, m) => {
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+    const t = new THREE.Mesh(new THREE.CylinderGeometry(r, r, L, 6), m);
+    t.position.set((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 0); t.rotation.z = Math.atan2(dy, dx) - Math.PI / 2;
+    t.castShadow = true; g2.add(t);
+  };
+  const tire = M('#1e1f21', { roughness: 0.9 }), metal = M('#b9bec4', { metalness: 0.6, roughness: 0.35 });
+  const g2 = new THREE.Group(), frame = M(color, { metalness: 0.3, roughness: 0.5 });
+  const R = [-0.53, 0.34], F = [0.53, 0.34], B = [-0.05, 0.3], S = [-0.2, 0.86], H = [0.38, 0.92], Hb = [0.42, 0.74];
+  [R, F].forEach(([wx, wy]) => {
+    const w = new THREE.Mesh(new THREE.TorusGeometry(0.33, 0.022, 8, 28), tire); w.position.set(wx, wy, 0); w.castShadow = true; g2.add(w);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.3, 0.008, 6, 28), metal); rim.position.set(wx, wy, 0); g2.add(rim);
+  });
+  tube(g2, B, S, 0.018, frame); tube(g2, S, H, 0.018, frame); tube(g2, B, Hb, 0.02, frame);
+  tube(g2, B, R, 0.012, frame); tube(g2, S, R, 0.012, frame); tube(g2, Hb, F, 0.014, metal); tube(g2, Hb, H, 0.018, frame);
+  const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.05, 0.13), tire); saddle.position.set(-0.23, 0.92, 0); g2.add(saddle);
+  const bar = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.58, 6), metal); bar.rotation.x = Math.PI / 2; bar.position.set(0.36, 0.99, 0); g2.add(bar);
+  return g2;
+}
+
+// Fahrradunterstand als eigene Gruppe (ein-/ausblendbar)
+const shelterG = new THREE.Group(); shelterG.userData.toggle = true; groups.site.add(shelterG);
+
+/* Selbstgebauter Fahrradunterstand vor dem Container (Richtung Straße): ca. 3 × 3 m,
+   0,5 m Abstand zum Haus, blaues Blechdach mit 0,4 m Vorsprung rundum, zur Straße hin offen,
+   vier Fahrräder drinnen. */
+{
+  const px0 = -9, px1 = 291, py0 = -359, py1 = -59;       // Steher-Achsen (Plan-cm); vorne bündig mit der Hausvorderkante
+  const ov = 40, hFront = 2.25, hBack = 1.95;              // Dach fällt nach hinten zum Container
+  const timber = M('#9c7b55', { roughness: 0.85 }), boards = M('#a88861', { roughness: 0.9 });
+  // Steher
+  [[px0, py0], [px0, py1], [px1, py0], [px1, py1]].forEach(([x, y]) => box(x - 5, x + 5, y - 5, y + 5, GN + 0.03, (x === px0 ? hFront : hBack) - 0.06, timber, shelterG, { collide: true }));
+  // Wände aus senkrechten Holzlatten (12 cm, 2 cm Fuge): hinten und an beiden Seiten
+  const slatCols = [M('#a88861', { roughness: 0.9 }), M('#9d7e58', { roughness: 0.9 }), M('#b2926a', { roughness: 0.9 })];
+  const topAtX = x => hFront - (hFront - hBack) * (x - px0) / (px1 - px0) - 0.1;
+  let sk = 0;
+  for (let y = py0; y < py1 - 1; y += 14) box(px1 - 1.2, px1 + 1.2, y, Math.min(y + 12, py1), GN + 0.07, hBack - 0.08, slatCols[sk++ % 3], shelterG);
+  for (const y of [py0, py1]) for (let x = px0 + 5; x < px1 - 5; x += 14) box(x, Math.min(x + 12, px1 - 5), y - 1.2, y + 1.2, GN + 0.07, topAtX(x + 6), slatCols[sk++ % 3], shelterG);
+  // Riegel innen, an denen die Latten befestigt sind
+  for (const h of [0.25, 1.45]) {
+    box(px1 - 4, px1 - 1.2, py0, py1, h, h + 0.07, timber, shelterG);
+    for (const y of [py0, py1]) box(px0, px1, y + (y === py0 ? 1.2 : -4), y + (y === py0 ? 4 : -1.2), h, h + 0.07, timber, shelterG);
+  }
+  // Kollision der Wände (unsichtbar)
+  box(px1 - 2, px1 + 2, py0, py1, GN + 0.07, hBack - 0.08, boards, shelterG, { collide: true }).visible = false;
+  for (const y of [py0, py1]) box(px0, px1, y - 2, y + 2, GN + 0.07, hBack - 0.08, boards, shelterG, { collide: true }).visible = false;
+  // Vorderseite: links und rechts je ein 17 cm Brett (außen bündig), oben zwei 17 cm Bretter quer
+  const fb = M('#a88861', { roughness: 0.9 }), frontTop = hFront - 0.18;
+  box(px0 - 3.5, px0 - 1, py0 - 5, py0 + 12, GN + 0.07, frontTop, fb, shelterG, { collide: true });
+  box(px0 - 3.5, px0 - 1, py1 - 12, py1 + 5, GN + 0.07, frontTop, fb, shelterG, { collide: true });
+  box(px0 - 3.5, px0 - 1, py0 - 5, py1 + 5, frontTop - 0.17, frontTop, fb, shelterG);
+  box(px0 - 3.5, px0 - 1, py0 - 5, py1 + 5, frontTop - 0.345, frontTop - 0.175, M('#9d7e58', { roughness: 0.9 }), shelterG);
+  // Pfetten
+  box(px0 - 6, px0 + 6, py0 - ov, py1 + ov, hFront - 0.18, hFront - 0.06, timber, shelterG);
+  box(px1 - 6, px1 + 6, py0 - ov, py1 + ov, hBack - 0.18, hBack - 0.06, timber, shelterG);
+  // blaues Trapezblech
+  const c = document.createElement('canvas'); c.width = 8; c.height = 64;
+  const g = c.getContext('2d');
+  const grd = g.createLinearGradient(0, 0, 0, 64);
+  grd.addColorStop(0, '#2d5d9a'); grd.addColorStop(0.25, '#3f74b5'); grd.addColorStop(0.5, '#2a568f'); grd.addColorStop(0.75, '#1f4677'); grd.addColorStop(1, '#2d5d9a');
+  g.fillStyle = grd; g.fillRect(0, 0, 8, 64);
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  const W = (px1 - px0 + 2 * ov) / 100, D = (py1 - py0 + 2 * ov) / 100, ang = Math.atan2(hFront - hBack, (px1 - px0) / 100);
+  tex.repeat.set(1, D / 0.08);
+  const roof = addMesh(new THREE.BoxGeometry(W / Math.cos(ang), 0.035, D), M('#ffffff', { map: tex, metalness: 0.35, roughness: 0.45 }), shelterG);
+  // Blech liegt direkt auf den Pfetten (Oberkante vorne hFront − 0,06, hinten hBack − 0,06)
+  roof.position.set(X((px0 + px1) / 2), (hFront + hBack) / 2 - 0.06 + 0.018, Z((py0 + py1) / 2));
+  roof.rotation.z = -ang;
+
+  // Holzboden (Dielen in Einfahrtsrichtung), ca. 15 cm über dem Schotter (Oberkante ±0,00)
+  const fl = GN + 0.15;                                    // Bodenoberkante 15 cm über dem Schotter
+  box(px0 - 5, px1 + 2, py0 - 5, py1 + 5, GN, fl - 0.015, M('#5b4630'), shelterG, { walk: true, shadow: false });
+  {
+    const deck = [M('#b08a5c', { roughness: 0.85 }), M('#a47f52', { roughness: 0.85 }), M('#ba9566', { roughness: 0.85 })];
+    let k = 0;
+    for (let y = py0 - 4; y < py1 + 4; y += 14.5) box(px0 - 4, px1 + 1, y, Math.min(y + 13.5, py1 + 4), fl - 0.015, fl, deck[k++ % 3], shelterG, { shadow: false });
+    // geneigtes Brett als Rampe vom Schotter auf den Boden (über die ganze Eingangsbreite)
+    {
+      const len = 0.6, rise = 0.15, ang = Math.atan2(rise, len);
+      const r = addMesh(new THREE.BoxGeometry(Math.hypot(len, rise), 0.03, (py1 - py0 - 24) / 100), deck[1], shelterG, { walk: true });
+      r.position.set(X(px0 - 6) - len / 2, GN + rise / 2 - 0.012, Z((py0 + py1) / 2));
+      r.rotation.z = ang;
+    }
+  }
+
+  // Fahrräder (Blickrichtung zur Rückwand)
+  const bike = (x, y, color) => {
+    const g2 = makeBike(color);
+    g2.position.set(X(x), fl + 0.01, Z(y));
+    shelterG.add(g2);
+    box(x - 90, x + 90, y - 15, y + 15, fl, fl + 1.0, mat.rail, shelterG, { collide: true }).visible = false;
+  };
+  [[-105, '#c0392b'], [-170, '#2c3e50'], [-245, '#27ae60'], [-310, '#e1e4e8']].forEach(([y, col]) => bike((px0 + px1) / 2 + 15, y, col));
+}
+
+/* Baum an der Grenze zu 1004/4, auf Höhe der Container-Stirnseite (x 400), hinter dem Ende des
+   Nachbarzauns. Etwa 2 m höher als der Balkon (Geländer OK +3,85) → Wipfel ca. +5,9 m. */
+{
+  const a = SITE.own[9], b = SITE.own[10], x = 400;
+  const y = a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]) - 10;   // direkt an der Grenze, knapp beim Nachbarn
+  // Salweide / Strauchweide: mehrere Stämmlinge aus dem Boden, breite, dichte, rundliche Krone, graugrünes Laub
+  const cx = X(x), cz = Z(y), top = 5.9;
+  const bark = M('#7a7266', { roughness: 0.95 });
+  let seed = 11; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 6; i++) {
+    const a = i / 6 * Math.PI * 2 + rnd() * 0.6, tilt = 0.18 + rnd() * 0.22, len = 2.4 + rnd() * 0.9;
+    const st = addMesh(new THREE.CylinderGeometry(0.045, 0.085, len, 7), bark, groups.site, { collide: i === 0 });
+    st.position.set(cx + Math.cos(a) * Math.sin(tilt) * len / 2, gAt(x) + Math.cos(tilt) * len / 2, cz + Math.sin(a) * Math.sin(tilt) * len / 2);
+    st.rotation.set(Math.sin(a) * tilt, 0, -Math.cos(a) * tilt);
+  }
+  const leaves = ['#7f9468', '#8ea476', '#6f855c', '#9aae84'].map(c => M(c, { flatShading: true, roughness: 0.95 }));
+  // Kronenballen: unten breit, oben gerundet; Wipfel bei ca. +5,9 m
+  const blobs = [
+    [0, 0, 1.9, 3.7], [1.1, 0.4, 1.3, 3.0], [-1.0, -0.5, 1.3, 3.1], [0.4, -1.1, 1.2, 2.9], [-0.5, 1.1, 1.2, 3.0],
+    [0.6, 0.6, 1.2, 4.4], [-0.6, -0.4, 1.1, 4.5], [0.1, 0.1, 1.0, top - 1.0], [1.3, -0.6, 0.9, 2.2], [-1.3, 0.6, 0.9, 2.2],
+  ];
+  blobs.forEach(([dx, dz, r, h], i) => {
+    const c = addMesh(new THREE.IcosahedronGeometry(r, 1), leaves[i % leaves.length], groups.site);
+    c.position.set(cx + dx, h, cz + dz);
+    c.rotation.set(rnd() * 3, rnd() * 3, rnd() * 3);
+    c.scale.set(1, 0.85 + rnd() * 0.2, 1);
+  });
+}
+
+/* ---------- Böden und Decken ---------- */
+box(29, 988, 29, 728, -0.25, 0, mat.floorWood, groups.eg, { walk: true });
+// Fliesen in WC, Technik, Abstellraum
+box(29, 148, 29, 230, 0, 0.004, mat.tile, groups.eg, { walk: true, shadow: false });
+box(29, 268, 396, 728, 0, 0.004, mat.tile, groups.eg, { walk: true, shadow: false });
+// Sockel außen
+box(-11, 1028, -11, -9, -0.65, -0.005, mat.plinth, groups.eg, { shadow: false });
+box(-11, 1028, 766, 768, -0.65, -0.005, mat.plinth, groups.eg, { shadow: false });
+// Sockel endet auf Fußbodenhöhe (±0,00), damit auch an Haus- und Terrassentür kein Absatz entsteht
+box(-11, -9, -9, 766, -0.65, -0.005, mat.plinth, groups.eg, { shadow: false });
+box(1026, 1028, -9, 766, -0.65, -0.005, mat.plinth, groups.eg, { shadow: false });
+
+// Geschossdecke über EG (UK +2,62, OK FFB OG +2,96), Loch fürs Stiegenhaus
+const slabH = [2.62, 2.96];
+box(29, 327, 29, 728, ...slabH, mat.floorWood, groups.og, { walk: true });
+box(558, 988, 29, 728, ...slabH, mat.floorWood, groups.og, { walk: true });
+box(327, 558, 246, 728, ...slabH, mat.floorWood, groups.og, { walk: true });
+box(29, 318, 29, 418, 2.96, 2.964, mat.tile, groups.og, { walk: true, shadow: false });
+// weiße Deckenuntersicht im EG
+for (const [a, b, c, d] of [[29, 327, 29, 728], [558, 988, 29, 728], [327, 558, 246, 728]]) box(a, b, c, d, 2.605, 2.62, mat.inner, groups.og, { shadow: false });
+// Stahlträger HEB 240 als Unterzug im Wohnbereich
+box(443, 988, 380, 396, 2.38, 2.62, mat.inner, groups.eg);
+box(437, 449, 380, 396, 0, 2.38, mat.inner, groups.eg, { collide: true });
+
+// Decke OG (Dachboden darüber)
+box(29, 988, 29, 728, 5.49, 5.80, mat.slab, groups.roof);
+
+/* ---------- Außenwände ---------- */
+const OGs = 2.96 + 0.895, OGt = OGs + 1.295;
+const extW = {
+  west: [
+    { a: 101, b: 167, s: 1.495, t: 2.39, kind: 'win' },             // ① WC
+    { a: 256.5, b: 369.5, s: 0, t: 2.225, kind: 'door' },           // Haustür
+    { a: 501, b: 567, s: 1.495, t: 2.39, kind: 'win' },             // ⑥ Technik
+    { a: 206, b: 302, s: OGs, t: OGt, kind: 'win' },                // ⑦ Bad
+    { a: 461, b: 557, s: OGs, t: OGt, kind: 'win' },                // ⑭ Kinderzimmer
+  ],
+  east: [
+    { a: 95.5, b: 338.5, s: 0.40, t: 2.225, kind: 'win' },          // ② Fixverglasung
+    { a: 452.5, b: 633.5, s: 0, t: 2.225, kind: 'door' },           // ③ Terrassentür
+    { a: 153, b: 271, s: OGs, t: OGt, kind: 'win' },                // ⑩ Schlafzimmer
+    { a: 488, b: 606, s: OGs, t: OGt, kind: 'win' },                // ⑪ Kinderzimmer
+  ],
+  south: [
+    { a: 361, b: 479, s: 0.895, t: 2.19, kind: 'win' },             // ⑤ Küche
+    { a: 664, b: 760, s: 0.895, t: 2.19, kind: 'win' },             // ④ Essen
+    { a: 245, b: 341, s: OGs, t: OGt, kind: 'win' },                // ⑬
+    { a: 667, b: 763, s: OGs, t: OGt, kind: 'win' },                // ⑫
+  ],
+  north: [
+    { a: 400, b: 496, s: 2.96, t: 5.185, kind: 'win' },             // ⑧ Stiegenfenster
+    { a: 881, b: 977, s: 2.96, t: 5.185, kind: 'door' },            // ⑨ Balkontür
+  ],
+};
+const EAVE = 5.97;
+for (const [band, h0, h1] of [['eg', -0.65, 2.96], ['og', 2.96, EAVE]]) {
+  const g = groups[band];
+  // Außenschicht (Putz) und Innenschicht als eine Wand: Fassade außen sichtbar
+  wall('x', -9, 29, -9, 1026, h0, h1, extW.north, mat.facade, g);
+  wall('x', 728, 766, -9, 1026, h0, h1, extW.south, mat.facade, g);
+  wall('z', -9, 29, 29, 728, h0, h1, extW.west, mat.facade, g);
+  wall('z', 988, 1026, 29, 728, h0, h1, extW.east, mat.facade, g);
+}
+// Schwellen in den Außentüren, damit man durchgehen kann
+box(-9, 29, 256.5, 369.5, -0.03, 0, mat.paving, groups.eg, { walk: true, shadow: false });
+box(988, 1026, 452.5, 633.5, -0.03, 0, mat.paving, groups.eg, { walk: true, shadow: false });
+box(881, 977, -9, 29, 2.93, 2.96, mat.paving, groups.og, { walk: true, shadow: false });
+// Innenseiten der Außenwände hell streichen: dünne Schicht
+for (const [band, h0, h1] of [['eg', 0, 2.62], ['og', 2.96, 5.49]]) {
+  const g = groups[band];
+  wall('x', 29, 29.6, 29, 988, h0, h1, extW.north, mat.inner, g, false, false);
+  wall('x', 727.4, 728, 29, 988, h0, h1, extW.south, mat.inner, g, false, false);
+  wall('z', 29, 29.6, 29, 728, h0, h1, extW.west, mat.inner, g, false, false);
+  wall('z', 987.4, 988, 29, 728, h0, h1, extW.east, mat.inner, g, false, false);
+}
+
+/* ---------- Dach: Satteldach 22°, First +7,86, Traufe Ü 90 cm, Ortgang Ü 80 cm ---------- */
+const pitch = THREE.MathUtils.degToRad(22), tanP = Math.tan(pitch);
+const ridge = 7.86, thick = 0.3 / Math.cos(pitch);
+const halfOut = 3.875 + 0.9;
+function profileShape(pts) { const s = new THREE.Shape(); pts.forEach(([u, v], i) => i ? s.lineTo(u, v) : s.moveTo(u, v)); s.closePath(); return s; }
+function extrudeAlongX(shape, x0, depth, materials, group) {
+  const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+  geo.rotateY(Math.PI / 2);
+  const m = addMesh(geo, materials, group);
+  m.position.x = x0;
+  return m;
+}
+{
+  const yTop = u => ridge - tanP * Math.abs(u);
+  const shape = profileShape([[-halfOut, yTop(halfOut)], [0, ridge], [halfOut, yTop(halfOut)], [halfOut, yTop(halfOut) - thick], [0, ridge - thick], [-halfOut, yTop(halfOut) - thick]]);
+  // Ortgang/Zierladen: Verblechung anthrazit
+  extrudeAlongX(shape, X(-89), 11.95, [M('#3b3e42', { metalness: 0.3, roughness: 0.5 }), mat.roof], groups.roof);
+  // Dachuntersicht: Holzschalung, hellbraun gestrichen (Bretter parallel zur Traufe)
+  {
+    const c = document.createElement('canvas'); c.width = 16; c.height = 64;
+    const g = c.getContext('2d');
+    g.fillStyle = '#c9a274'; g.fillRect(0, 0, 16, 64);
+    g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(0, 8, 16, 20);
+    g.fillStyle = '#8c6b47'; g.fillRect(0, 60, 16, 4);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    const L = halfOut / Math.cos(pitch);
+    t.repeat.set(1, L / 0.12);
+    const soffit = M('#ffffff', { map: t, roughness: 0.8 });
+    for (const s of [1, -1]) {
+      const m = addMesh(new THREE.BoxGeometry(11.95, 0.012, L), soffit, groups.roof, { shadow: false });
+      m.position.set(X(-89) + 11.95 / 2, (ridge - thick + yTop(halfOut) - thick) / 2 - 0.008, s * halfOut / 2);
+      m.rotation.x = s * pitch;
+    }
+  }
+  // Giebelwände
+  const gy = u => ridge - thick - tanP * Math.abs(u);
+  const gable = profileShape([[-3.875, EAVE], [3.875, EAVE], [3.875, gy(3.875)], [0, ridge - thick], [-3.875, gy(3.875)]]);
+  extrudeAlongX(gable, X(-9), 0.38, [mat.facade, mat.facade], groups.roof);
+  extrudeAlongX(gable, X(988), 0.38, [mat.facade, mat.facade], groups.roof);
+  // Kamin
+  box(928, 972, 392, 436, 5.8, 8.2, mat.white, groups.roof);
+  box(922, 978, 386, 442, 8.2, 8.36, mat.dark, groups.roof);
+
+  /* Dachrinnen an beiden Traufen und zwei Fallrohre:
+     1) an der Hausecke zwischen Fahrradunterstand und Haus (Traufe zum Container),
+     2) hinter der Wärmepumpe, um die Ecke an der Westseite. */
+  const zinc = M('#8d9195', { metalness: 0.5, roughness: 0.4 });
+  const eaveH = yTop(halfOut) - thick;                      // Unterkante Traufe ≈ +5,61
+  const pipe = (a, b, r) => {                               // a, b: [x cm, y cm, h m]
+    const A = new THREE.Vector3(X(a[0]), a[2], Z(a[1])), B = new THREE.Vector3(X(b[0]), b[2], Z(b[1]));
+    const len = A.distanceTo(B);
+    const m = addMesh(new THREE.CylinderGeometry(r, r, len, 12), zinc, groups.roof);
+    m.position.copy(A).add(B).multiplyScalar(0.5);
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), B.clone().sub(A).normalize());
+  };
+  for (const gy0 of [-106, 863]) {
+    const geo = new THREE.CylinderGeometry(0.07, 0.07, 11.95, 14);
+    geo.rotateZ(Math.PI / 2);                                // Achse entlang der Traufe (x)
+    const g = addMesh(geo, zinc, groups.roof, { shadow: false });
+    g.position.set(X(-89) + 11.95 / 2, eaveH - 0.02, Z(gy0));
+  }
+  for (const [px, wallY, gy0] of [[8, -17, -106], [8, 774, 863]]) {
+    pipe([px, gy0, eaveH - 0.08], [px, gy0, eaveH - 0.25], 0.045);          // Ablaufstutzen
+    pipe([px, gy0, eaveH - 0.25], [px, wallY, eaveH - 0.75], 0.045);         // Bogen zur Wand
+    pipe([px, wallY, eaveH - 0.75], [px, wallY, -0.7], 0.05);               // Fallrohr, gerade in die Erde (Rohre verlegt)
+  }
+}
+
+/* ---------- Innenwände ---------- */
+const EGh = [0, 2.62], OGh = [2.96, 5.49];
+const door = (a, b, base) => ({ a, b, s: base, t: base + 2.065, kind: 'door' });
+// EG
+wall('z', 148, 163, 29, 245, ...EGh, [], mat.inner, groups.eg);                   // WC Ost
+wall('x', 230, 245, 29, 148, ...EGh, [door(45, 133, 0)], mat.inner, groups.eg);   // WC Süd, Tür
+wall('z', 308, 327, 29, 250, ...EGh, [], mat.inner, groups.eg);                   // Stiege West
+wall('z', 558, 574, 29, 246, ...EGh, [], mat.inner, groups.eg);                   // Stiege Ost
+wall('z', 430, 459, 100, 246, ...EGh, [], mat.inner, groups.eg);                  // Mittelwand Stiege
+wall('x', 236, 250, 459, 558, ...EGh, [door(468, 556, 0)], mat.inner, groups.eg); // Speisekammer unter der Stiege, Tür vom Wohnzimmer
+wall('z', 449, 466, 250, 396, ...EGh, [door(254, 342, 0)], mat.inner, groups.eg); // Windfang / Wohnzimmer mit Tür
+// Regale in der Speisekammer (hinten, wo die Stiege niedrig ist, und an der Ostwand)
+{
+  const shelfMat = M('#e8e2d6');
+  box(459, 558, 29, 100, 0, 1.45, shelfMat, groups.eg, { collide: true });
+  box(538, 558, 100, 205, 0, 0.03, shelfMat, groups.eg, { collide: true });
+  box(538, 558, 100, 205, 0.03, 1.9, shelfMat, groups.eg, { collide: true }).visible = false;
+  box(556, 558, 100, 205, 0, 1.9, shelfMat, groups.eg);
+  for (const h of [0.45, 0.85, 1.25, 1.65]) box(538, 558, 100, 205, h, h + 0.02, M('#cfc6b4'), groups.eg);
+}
+wall('x', 380, 396, 29, 437, ...EGh, [door(40, 128, 0)], mat.inner, groups.eg);   // Windfang / Technik
+wall('z', 268, 285, 396, 728, ...EGh, [], mat.inner, groups.eg);                  // Technik Ost
+// OG
+wall('z', 318, 332, 29, 418, ...OGh, [door(280, 368, 2.96)], mat.inner, groups.og);         // Bad Ost
+wall('x', 418, 436, 29, 988, ...OGh, [door(345, 430, 2.96), door(470, 550, 2.96)], mat.inner, groups.og);
+wall('z', 437, 455, 436, 728, ...OGh, [], mat.inner, groups.og);                            // Kinderzimmer-Trennwand
+wall('z', 560, 578, 29, 418, ...OGh, [door(268, 352, 2.96)], mat.inner, groups.og);         // Schlafzimmer West
+wall('z', 430, 459, 100, 246, 2.96, 3.92, [], mat.inner, groups.og);                         // Brüstung Mitte
+railing(332, 430, 244, 249, 2.96, 3.92, groups.og);                                          // Geländer Stiegenloch
+
+/* ---------- Stiege: 16 Steigungen 18,5 cm, halbgewendelt ---------- */
+{
+  const cx = 444, cy = 100, rc = 65.5, rin = 14.5;
+  const L1 = 146, Lc = Math.PI * rc, L2 = 146, L = L1 + Lc + L2, N = 16;
+  const rayBox = (dx, dy) => {
+    const ts = [];
+    if (dx < -1e-6) ts.push((327 - cx) / dx);
+    if (dx > 1e-6) ts.push((558 - cx) / dx);
+    if (dy < -1e-6) ts.push((29 - cy) / dy);
+    const t = Math.min(...ts.filter(v => v > 0));
+    return [cx + dx * t, cy + dy * t];
+  };
+  const edges = s => {
+    if (s <= L1) { const y = 246 - s; return [[430, y], [327, y]]; }
+    if (s <= L1 + Lc) {
+      const phi = Math.PI - (s - L1) / rc, dx = Math.cos(phi), dy = -Math.sin(phi);
+      return [[cx + rin * dx, cy + rin * dy], rayBox(dx, dy)];
+    }
+    const y = 100 + (s - L1 - Lc); return [[459, y], [558, y]];
+  };
+  for (let i = 0; i < N; i++) {
+    const s0 = i * L / N, s1 = (i + 1) * L / N, top = (i + 1) * 2.96 / N;
+    const inner = [], outer = [];
+    for (let k = 0; k <= 14; k++) { const [a, b] = edges(s0 + (s1 - s0) * k / 14); inner.push(a); outer.push(b); }
+    const poly = [...inner, ...outer.reverse()];
+    const shape = profileShape(poly.map(([x, y]) => [X(x), -Z(y)]));
+    // Westlauf massiv bis zum Boden; Stufen über der Speisekammer nur als Platte, damit darunter Platz bleibt
+    const solid = poly.reduce((s, p) => s + p[0], 0) / poly.length < 444;
+    const depth = solid ? top : 0.22;
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2);
+    const tread = addMesh(geo, mat.stair, groups.eg, { walk: true });
+    if (!solid) tread.position.y = top - depth;
+  }
+}
+
+/* ---------- Möbel (vereinfacht, nach Polierplan) ---------- */
+const F = (x0, x1, y0, y1, h0, h1, m, g) => box(x0, x1, y0, y1, h0, h1, m, g, { collide: true });
+const eg = groups.eg;
+const km = {
+  front: M('#f4f3ef', { roughness: 0.5 }), top: M('#b58a5a', { roughness: 0.6 }), plinth: M('#3a3a3a'),
+  black: M('#1d1e20', { roughness: 0.4 }), steel: M('#c3c7cb', { metalness: 0.6, roughness: 0.35 }),
+  stove: M('#232425', { roughness: 0.55 }), fire: new THREE.MeshStandardMaterial({ color: '#ff8a2a', emissive: '#ff6a10', emissiveIntensity: 1.6 }),
+  stone: M('#8d8a85', { roughness: 0.9 }), screen: new THREE.MeshStandardMaterial({ color: '#0d1014', roughness: 0.2, emissive: '#1a2533', emissiveIntensity: 0.4 }),
+  rug: M('#c9bfae', { roughness: 1 }), plant: M('#4f7a3d', { flatShading: true }), pot: M('#b5704a'),
+};
+const cyl = (x, y, r, h0, h1, m, g, collide = false) => {
+  const c = addMesh(new THREE.CylinderGeometry(r / 100, r / 100, h1 - h0, 20), m, g, { collide });
+  c.position.set(X(x), (h0 + h1) / 2, Z(y));
+  return c;
+};
+
+/* Küche in G-Form:
+   A Westwand (vor der Technikraum-Wand) mit Spüle, Geschirrspüler, Herd
+   B Südwand unter dem Küchenfenster ⑤
+   C Nordseite zum Windfang hin, vorne mit dem hohen Kühlschrank
+   D Arbeitsplatte hinter dem Esstisch, von der Südwand bis zum Durchgang.
+   Von der Terrassentür aus gesehen: Kühlschrank und Durchgang vorne rechts. */
+function counter(x0, x1, y0, y1) {
+  F(x0, x1, y0, y1, 0, 0.1, km.plinth, eg);
+  box(x0, x1, y0, y1, 0.1, 0.87, km.front, eg);
+  box(x0 - 1, x1 + 1, y0 - 1, y1 + 1, 0.87, 0.91, km.top, eg);
+}
+counter(285, 347, 400, 728);   // A
+counter(347, 498, 666, 728);   // B
+counter(347, 498, 400, 462);   // C
+counter(498, 560, 560, 728);   // D
+F(498, 560, 400, 462, 0, 2.18, km.front, eg);                             // Kühl-/Gefrierschrank hoch
+box(549, 552, 462, 465, 0.95, 1.95, km.steel, eg);                        // Griff
+box(290, 340, 480, 535, 0.905, 0.915, km.steel, eg);                      // Spüle
+cyl(300, 507, 1.5, 0.91, 1.18, km.steel, eg);                             // Armatur
+box(346, 348, 540, 598, 0.15, 0.8, km.steel, eg);                         // Geschirrspüler-Front
+box(290, 340, 600, 660, 0.91, 0.915, km.black, eg);                       // Kochfeld
+box(346, 348, 600, 660, 0.12, 0.8, km.black, eg);                         // Backofen
+box(285, 330, 590, 670, 1.55, 1.75, km.steel, eg);                        // Dunstabzug
+box(285, 320, 462, 590, 1.45, 2.18, km.front, eg);                        // Oberschränke
+box(285, 320, 670, 728, 1.45, 2.18, km.front, eg);
+box(347, 437, 396, 430, 1.45, 2.18, km.front, eg);                        // Oberschränke an der Windfangwand
+box(285, 320, 400, 462, 1.45, 2.18, km.front, eg);
+box(440, 470, 690, 715, 0.91, 1.1, km.plant, eg);                         // Kräuter am Fenster
+
+// Essplatz
+F(690, 900, 572, 658, 0.72, 0.76, mat.wood, groups.eg);
+F(700, 710, 582, 592, 0, 0.72, mat.wood, groups.eg); F(880, 890, 582, 592, 0, 0.72, mat.wood, groups.eg);
+F(700, 710, 638, 648, 0, 0.72, mat.wood, groups.eg); F(880, 890, 638, 648, 0, 0.72, mat.wood, groups.eg);
+[710, 775, 840].forEach(x => { F(x, x + 44, 522, 562, 0, 0.46, mat.wood, groups.eg); F(x, x + 44, 668, 708, 0, 0.46, mat.wood, groups.eg); });
+/* Wohnzimmer: Fernseher an der Stiegenwand, gegenüber der großen Fixverglasung ②.
+   Ecksofa mit Blick zum Fernseher, Schwedenofen vor dem Kamin. */
+box(576, 624, 80, 280, 0.06, 0.48, mat.wood, eg, { collide: true });      // Lowboard
+box(576, 624, 80, 280, 0, 0.06, km.plinth, eg);
+box(575, 579, 110, 240, 0.98, 1.72, km.screen, eg);                       // Fernseher 65"
+box(679, 853, 95, 290, 0, 0.012, km.rug, eg, { shadow: false });          // Teppich
+F(710, 790, 140, 240, 0, 0.38, mat.wood, eg);                              // Couchtisch
+F(850, 935, 70, 310, 0, 0.42, mat.sofa, eg);                               // Sofa lang, Blick nach Westen
+box(912, 935, 70, 310, 0.42, 0.84, mat.sofa, eg);
+box(850, 912, 290, 310, 0.42, 0.62, mat.sofa, eg);
+F(690, 850, 35, 125, 0, 0.42, mat.sofa, eg);                               // Ecke entlang der Nordwand
+box(690, 850, 35, 58, 0.42, 0.84, mat.sofa, eg);
+box(690, 708, 58, 125, 0.42, 0.62, mat.sofa, eg);
+cyl(960, 60, 14, 0, 0.32, km.pot, eg, true);                               // Pflanze in der Ecke
+{ const p = addMesh(new THREE.IcosahedronGeometry(0.35, 0), km.plant, eg); p.position.set(X(960), 0.7, Z(60)); }
+
+// Kamin (Fang durch beide Geschosse) mit Schwedenofen davor
+F(925, 988, 385, 440, 0, 2.62, mat.inner, eg);
+F(925, 988, 385, 440, 2.96, 5.49, mat.inner, groups.og);
+box(815, 925, 362, 462, 0, 0.015, km.stone, eg, { shadow: false });       // Funkenschutzplatte
+F(855, 905, 388, 437, 0.02, 1.08, km.stove, eg);                          // Ofenkorpus
+box(853, 855, 395, 430, 0.25, 0.75, km.fire, eg, { shadow: false });     // Sichtscheibe mit Feuer
+box(853, 907, 386, 439, 1.08, 1.12, km.stone, eg);                        // Speckstein-Deckplatte
+cyl(880, 412, 7.5, 1.12, 1.45, km.stove, eg);                             // Rauchrohr hoch
+{ const r = cyl(902, 412, 7.5, 0, 0.45, km.stove, eg); r.rotation.z = Math.PI / 2; r.position.y = 1.45; }
+{ const glow = new THREE.PointLight('#ff8a3a', 1.2, 4, 2); glow.position.set(X(830), 0.5, Z(412)); eg.add(glow); }
+// WC, Technik
+F(80, 120, 35, 90, 0, 0.42, mat.white, groups.eg);
+F(40, 105, 650, 715, 0, 1.85, mat.white, groups.eg);                    // Wärmepumpe Unitower
+F(195, 258, 655, 718, 0, 0.85, mat.white, groups.eg);                   // Waschmaschine
+// OG Schlafzimmer
+F(630, 810, 34, 234, 0 + 2.96, 0.5 + 2.96, mat.bed, groups.og); box(630, 810, 34, 44, 3.46, 3.96, mat.wood, groups.og);
+F(578, 830, 362, 418, 2.96, 5.15, mat.white, groups.og);
+// Bad
+F(35, 110, 35, 205, 2.96, 3.51, mat.white, groups.og);
+F(200, 300, 380, 418, 2.96, 3.81, mat.white, groups.og);
+F(210, 260, 35, 90, 2.96, 3.38, mat.white, groups.og);
+// Kinderzimmer
+F(37, 127, 527, 722, 2.96, 3.41, mat.bed, groups.og); F(260, 420, 668, 728, 2.96, 3.71, mat.wood, groups.og);
+F(895, 985, 527, 722, 2.96, 3.41, mat.bed, groups.og); F(560, 760, 668, 728, 2.96, 3.71, mat.wood, groups.og);
+
+/* ---------- Türen ----------
+   Türblätter drehen sich um ihr Band. Beim Rundgang gehen sie auf, sobald man
+   näher als 1,6 m herankommt, und schließen sich wieder, wenn man weg ist. */
+const doors = [];
+const doorMat = { white: M('#f6f5f1', { roughness: 0.6 }), entry: M('#6a4127', { roughness: 0.6 }), handle: km.steel };
+function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', group }) {
+  // axis: Richtung der Wand ('x' oder 'z'); t: Wandmitte quer (cm); a..b: lichte Öffnung entlang der Wand (cm)
+  const w = (b - a - 12) / 100, h = top - base - 0.06, th = 0.04;
+  const pivot = new THREE.Group();
+  const leaf = new THREE.Group();
+  if (kind === 'glass') {
+    const bar = 0.09;
+    const parts = [[w / 2, bar / 2, w, bar], [w / 2, h - bar / 2, w, bar], [bar / 2, h / 2, bar, h], [w - bar / 2, h / 2, bar, h]];
+    parts.forEach(([cx, cy, sw, sh]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, th), mat.frame); m.position.set(cx, cy, 0); m.castShadow = true; leaf.add(m); });
+    const g = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * bar, h - 2 * bar, 0.01), mat.glass); g.position.set(w / 2, h / 2, 0); g.renderOrder = 2; leaf.add(g);
+  } else {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), kind === 'entry' ? doorMat.entry : doorMat.white);
+    m.position.set(w / 2, h / 2, 0); m.castShadow = true; m.receiveShadow = true; leaf.add(m);
+    if (kind === 'entry') { const s = new THREE.Mesh(new THREE.BoxGeometry(0.14, h * 0.7, 0.05), mat.glass); s.position.set(w * 0.5, h * 0.5, 0); leaf.add(s); }
+  }
+  // Drücker auf beiden Seiten
+  const hd = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.025, 0.14), doorMat.handle); hd.position.set(w - 0.09, 1.02, 0); leaf.add(hd);
+  pivot.add(leaf);
+  const hingeAt = hinge === 'a' ? a + 6 : b - 6;
+  if (axis === 'x') pivot.position.set(X(hingeAt), base, Z(t)); else pivot.position.set(X(t), base, Z(hingeAt));
+  const baseRot = axis === 'x' ? (hinge === 'a' ? 0 : Math.PI) : (hinge === 'a' ? -Math.PI / 2 : Math.PI / 2);
+  // Richtung, in die das Blatt aufschwingt (swing: [dx, dz] in Weltkoordinaten)
+  let openRot = baseRot;
+  for (const s of [1, -1]) {
+    const th2 = baseRot + s * Math.PI / 2 * 0.94;
+    if (Math.cos(th2) * swing[0] - Math.sin(th2) * swing[1] > 0.5) { openRot = th2; break; }
+  }
+  pivot.rotation.y = baseRot;
+  group.add(pivot);
+  const cx = axis === 'x' ? X((a + b) / 2) : X(t), cz = axis === 'x' ? Z(t) : Z((a + b) / 2);
+  doors.push({ pivot, baseRot, openRot, cx, cz, base, cur: 0 });
+}
+// EG
+doorLeaf({ axis: 'x', t: 237.5, a: 45, b: 133, base: 0, top: 2.065, hinge: 'a', swing: [0, -1], group: groups.eg });              // WC
+doorLeaf({ axis: 'x', t: 388, a: 40, b: 128, base: 0, top: 2.065, hinge: 'a', swing: [0, 1], group: groups.eg });                  // Technik
+doorLeaf({ axis: 'z', t: 10, a: 256.5, b: 369.5, base: 0, top: 2.225, hinge: 'b', swing: [1, 0], kind: 'entry', group: groups.eg }); // Haustür
+doorLeaf({ axis: 'z', t: 1007, a: 452.5, b: 549, base: 0, top: 2.225, hinge: 'a', swing: [-1, 0], kind: 'glass', group: groups.eg });  // Terrassentür links
+doorLeaf({ axis: 'z', t: 1007, a: 537, b: 633.5, base: 0, top: 2.225, hinge: 'b', swing: [-1, 0], kind: 'glass', group: groups.eg });  // Terrassentür rechts
+// OG
+doorLeaf({ axis: 'z', t: 325, a: 280, b: 368, base: 2.96, top: 5.025, hinge: 'a', swing: [-1, 0], group: groups.og });            // Bad
+doorLeaf({ axis: 'x', t: 427, a: 345, b: 430, base: 2.96, top: 5.025, hinge: 'a', swing: [0, 1], group: groups.og });             // Kinderzimmer West
+doorLeaf({ axis: 'x', t: 427, a: 470, b: 550, base: 2.96, top: 5.025, hinge: 'b', swing: [0, 1], group: groups.og });             // Kinderzimmer Ost
+doorLeaf({ axis: 'z', t: 457.5, a: 254, b: 342, base: 0, top: 2.065, hinge: 'a', swing: [1, 0], group: groups.eg });                // Wohnzimmer
+doorLeaf({ axis: 'x', t: 243, a: 468, b: 556, base: 0, top: 2.065, hinge: 'a', swing: [0, -1], group: groups.eg });                // Speisekammer
+doorLeaf({ axis: 'z', t: 569, a: 268, b: 352, base: 2.96, top: 5.025, hinge: 'a', swing: [1, 0], group: groups.og });             // Schlafzimmer
+doorLeaf({ axis: 'x', t: 10, a: 881, b: 977, base: 2.96, top: 5.185, hinge: 'b', swing: [0, 1], kind: 'glass', group: groups.og }); // Balkontür
+// Mittelpfosten der Terrassentür
+box(1000, 1014, 541, 545, 0, 2.225, mat.frame, groups.eg);
+
+function updateDoors(dt) {
+  for (const d of doors) {
+    const near = walking && Math.hypot(player.x - d.cx, player.z - d.cz) < 1.6 && Math.abs(player.feet - d.base) < 1.2;
+    d.cur += ((near ? 1 : 0) - d.cur) * Math.min(1, dt * 5);
+    d.pivot.rotation.y = d.baseRot + (d.openRot - d.baseRot) * d.cur;
+  }
+}
+
+/* ---------- Carport-Planung: drei Varianten, Autos, Unterstand – alles ein-/ausblendbar ----------
+   Straßenrahmen: s = Lauflänge entlang der geraden Straßengrenze ab dem Nordost-Spitz (Richtung Westen),
+   d = Abstand von der Grenze ins Grundstück. Haustür bei s ≈ 19,1–19,9 m, d ≈ 8,1–8,9 m.
+   Der Schwemmholzzaun beginnt bei s ≈ 18,5 m → Stellplätze liegen östlich davon, der geschlossene
+   Raum (Räder, Mäher, Werkstatt) sitzt an der Westseite und schließt die Wetterseite. */
+const carport = { variants: [null], cars: null, roofs: [] };
+{
+  const R0 = SITE.own[9], N8 = SITE.own[8];
+  const L0 = Math.hypot(N8[0] - R0[0], N8[1] - R0[1]);
+  const u = [(N8[0] - R0[0]) / L0, (N8[1] - R0[1]) / L0];            // entlang der Straße (nach Westen)
+  const nIn = [u[1], -u[0]];                                          // ins Grundstück (zum Haus)
+
+  const anth = M('#3b3e42', { roughness: 0.55, metalness: 0.25 });
+  const soffit = M('#cdb592', { roughness: 0.8 });
+  const conc = M('#bdb9b1', { roughness: 0.95 });
+  const greyWood = M('#8f8a81', { roughness: 0.9 });
+  const benchWood = M('#c49a62', { roughness: 0.75 });
+  const steelM = M('#9aa0a6', { metalness: 0.5, roughness: 0.4 });
+  const glassM = M('#9fc3d8', { transparent: true, opacity: 0.35, roughness: 0.05, depthWrite: false });
+  // vergraute Lärchenbretter wie der Westzaun: Textur 0,5 m breit (4 Bretter)
+  const boardCanvas = (() => {
+    const c = document.createElement('canvas'); c.width = 128; c.height = 128;
+    const g = c.getContext('2d'), cols = ['#9b978f', '#8b877f', '#a8a399', '#857f76'];
+    for (let i = 0; i < 4; i++) {
+      g.fillStyle = cols[i]; g.fillRect(i * 32, 0, 32, 128);
+      g.fillStyle = 'rgba(0,0,0,0.38)'; g.fillRect(i * 32 + 30, 0, 2, 128);
+      g.fillStyle = 'rgba(255,255,255,0.08)'; g.fillRect(i * 32, 0, 3, 128);
+    }
+    for (let k = 0; k < 70; k++) { g.fillStyle = 'rgba(60,55,50,0.12)'; g.fillRect(Math.random() * 128, 0, 1, 128); }
+    return c;
+  })();
+  const boardMat = len => {
+    const t = new THREE.CanvasTexture(boardCanvas); t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(0.2, len / 0.5), 1); t.anisotropy = 4;
+    return M('#ffffff', { map: t, roughness: 0.9 });
+  };
+
+  /* Lokaler Rahmen: a (m) entlang dir, b (m) senkrecht dazu Richtung Haus, Höhen wie überall (±0,00 = EG). */
+  function frame(ox, oy, dx, dy, parent) {
+    const g = new THREE.Group(); g.position.set(X(ox), 0, Z(oy)); g.rotation.y = Math.atan2(-dy, dx); parent.add(g);
+    const rg = new THREE.Group(); g.add(rg); carport.roofs.push(rg);   // Dachteile, in den Ansichten EG/OG offen ausgeblendet
+    const P = (a, b) => [ox + a * 100 * dx + b * 100 * dy, oy + a * 100 * dy - b * 100 * dx];
+    const lb = (a0, a1, b0, b1, h0, h1, m, opts) => {
+      const w = a1 - a0, d = b1 - b0, h = h1 - h0;
+      if (w <= 0 || d <= 0 || h <= 0) return null;
+      const mesh = addMesh(new THREE.BoxGeometry(w, h, d), m, opts && opts.roof ? rg : g, opts);
+      mesh.position.set((a0 + a1) / 2, (h0 + h1) / 2, -(b0 + b1) / 2);
+      return mesh;
+    };
+    // unsichtbare Kollision in kleinen Stücken (gedrehte Boxen → achsparallele Hüllen bleiben klein)
+    const col = (a0, a1, b0, b1, h0 = GN, h1 = GN + 2.2) => {
+      const na = Math.max(1, Math.ceil((a1 - a0) / 0.35)), nb = Math.max(1, Math.ceil((b1 - b0) / 0.35));
+      for (let i = 0; i < na; i++) for (let j = 0; j < nb; j++) {
+        const m = lb(a0 + (a1 - a0) * i / na, a0 + (a1 - a0) * (i + 1) / na, b0 + (b1 - b0) * j / nb, b0 + (b1 - b0) * (j + 1) / nb, h0, h1, mat.rail, { collide: true, shadow: false });
+        if (m) m.visible = false;
+      }
+    };
+    // Bretterwand entlang a ('a') oder b ('b'), mit Öffnungen {f, t, s, e} (entlang, Höhe von/bis)
+    const wallL = (dir, from, to, at, t, h0, h1, ops = []) => {
+      const cuts = [...new Set([from, to, ...ops.flatMap(o => [o.f, o.t])])].sort((p, q) => p - q);
+      for (let i = 0; i < cuts.length - 1; i++) {
+        const p = cuts[i], q = cuts[i + 1], o = ops.find(o => o.f <= p && o.t >= q);
+        const parts = o ? [[h0, o.s], [o.e, h1]] : [[h0, h1]];
+        for (const [s, e] of parts) if (e - s > 0.005) {
+          const mm = boardMat(q - p);
+          dir === 'a' ? lb(p, q, at - t / 2, at + t / 2, s, e, mm) : lb(at - t / 2, at + t / 2, p, q, s, e, mm);
+        }
+        if (!o || o.s > h0 + 0.3) dir === 'a' ? col(p, q, at - t / 2, at + t / 2) : col(at - t / 2, at + t / 2, p, q);
+        if (o && o.s > h0 + 0.3) {                         // Fenster: Glas und Rahmen
+          const gl = dir === 'a' ? lb(p, q, at - 0.01, at + 0.01, o.s, o.e, glassM, { shadow: false }) : lb(at - 0.01, at + 0.01, p, q, o.s, o.e, glassM, { shadow: false });
+          const fr = 0.05;
+          if (dir === 'a') { lb(p, q, at - t / 2 - 0.01, at + t / 2 + 0.01, o.s - fr, o.s, anth); lb(p, q, at - t / 2 - 0.01, at + t / 2 + 0.01, o.e, o.e + fr, anth); }
+          else { lb(at - t / 2 - 0.01, at + t / 2 + 0.01, p, q, o.s - fr, o.s, anth); lb(at - t / 2 - 0.01, at + t / 2 + 0.01, p, q, o.e, o.e + fr, anth); }
+        }
+      }
+      // Türzarge / Fensterrahmen seitlich
+      ops.forEach(o => [o.f, o.t].forEach(v => {
+        const fs = o.s > h0 + 0.3 ? o.s : h0;
+        dir === 'a' ? lb(v - 0.03, v + 0.03, at - t / 2 - 0.01, at + t / 2 + 0.01, fs, o.e, anth) : lb(at - t / 2 - 0.01, at + t / 2 + 0.01, v - 0.03, v + 0.03, fs, o.e, anth);
+      }));
+    };
+    // Fläche aus einem Polygon in lokalen (a, b)
+    const slab = (pts, h0, h1, m, opts) => {
+      const s = new THREE.Shape(pts.map(([a, b]) => new THREE.Vector2(a, b)));
+      const geo = new THREE.ExtrudeGeometry(s, { depth: h1 - h0, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2); geo.translate(0, h0, 0);
+      return addMesh(geo, m, opts && opts.roof ? rg : g, opts);
+    };
+    const post = (a, b, h1, m = anth, sz = 0.12) => { lb(a - sz / 2, a + sz / 2, b - sz / 2, b + sz / 2, GN, h1, m); col(a - sz / 2, a + sz / 2, b - sz / 2, b + sz / 2); };
+    const put = (obj, a, b, h, rot = 0) => { obj.position.set(a, h, -b); obj.rotation.y = rot; g.add(obj); return obj; };
+    return { g, rg, P, lb, col, wallL, slab, post, put, dir: [dx, dy] };
+  }
+  // Fläche aus Plan-Punkten (cm) direkt in Weltkoordinaten
+  const slabPlan = (pts, h0, h1, m, parent) => {
+    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(X(x), -Z(y))));
+    const geo = new THREE.ExtrudeGeometry(s, { depth: h1 - h0, bevelEnabled: false });
+    geo.rotateX(-Math.PI / 2); geo.translate(0, h0, 0);
+    return addMesh(geo, m, parent);
+  };
+  // Punkt auf der Linie „Abstand d (cm) zur Straße“ mit gegebenem Plan-y
+  const onD = (d, y) => [(d - nIn[1] * (y - R0[1])) / nIn[0] + R0[0], y];
+  /* Überdachter Weg vom Carport zur Haustür (Haustür y 256–370, Hauswand x −9): Viereck von der Hauswand
+     zur Hinterkante des Carportdachs (lokal a aD … aC bei b = bEdge). So kommt man trocken vom Auto ins Haus;
+     der Betonweg zur Wärmepumpe und in den Garten läuft darunter durch. */
+  const walkway = (parent, F, aC, aD, bEdge) => {
+    const pts = [[-10, 130], [-10, 400], F.P(aC, bEdge), F.P(aD, bEdge)];
+    const rg = new THREE.Group(); parent.add(rg); carport.roofs.push(rg);
+    slabPlan(pts, 2.42, 2.52, anth, rg);
+    slabPlan(pts, 2.40, 2.42, soffit, rg);
+  };
+
+  /* Kleinteile: Rasenmäher, Werkbank, Regal */
+  const makeMower = () => {
+    const g = new THREE.Group(), red = M('#c0392b', { roughness: 0.45, metalness: 0.2 }), blk = M('#1e1f21', { roughness: 0.8 });
+    const bx = (w, h, d, x, y, z, m) => { const k = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m); k.position.set(x, y, z); k.castShadow = true; g.add(k); return k; };
+    bx(0.58, 0.16, 0.5, 0, 0.2, 0, red);                        // Gehäuse
+    const eng = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.15, 0.2, 14), blk); eng.position.set(0.04, 0.38, 0); eng.castShadow = true; g.add(eng);
+    [[0.22, 0.22], [0.22, -0.22], [-0.22, 0.22], [-0.22, -0.22]].forEach(([x, z]) => {
+      const w = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 0.05, 14), blk); w.rotation.x = Math.PI / 2; w.position.set(x, 0.1, z); g.add(w);
+    });
+    bx(0.34, 0.28, 0.4, -0.45, 0.3, 0, M('#2f3a2c'));         // Fangkorb
+    [0.19, -0.19].forEach(z => { const h = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.95, 6), blk); h.position.set(-0.55, 0.62, z); h.rotation.z = -0.75; g.add(h); });
+    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.42, 6), blk); grip.rotation.x = Math.PI / 2; grip.position.set(-0.87, 0.95, 0); g.add(grip);
+    return g;
+  };
+  // Werkbank entlang a (Länge len) an einer Wand, Tiefe 0,7 m in Richtung +b oder −b
+  const workbench = (F, a0, len, bWall, sign, peg = true) => {
+    const fl = GN + 0.03, b0 = sign > 0 ? bWall : bWall - 0.7, b1 = b0 + 0.7;
+    F.lb(a0, a0 + len, b0, b1, fl + 0.85, fl + 0.9, benchWood);
+    [a0 + 0.05, a0 + len - 0.1].forEach(a => [b0 + 0.05, b1 - 0.1].forEach(b => F.lb(a, a + 0.05, b, b + 0.05, fl, fl + 0.85, benchWood)));
+    F.lb(a0 + 0.05, a0 + len - 0.05, b0 + 0.05, b1 - 0.05, fl + 0.18, fl + 0.21, benchWood);       // Ablage unten
+    F.col(a0, a0 + len, b0, b1, fl, fl + 0.9);
+    if (!peg) return;
+    // Lochwand mit Werkzeug
+    const wb0 = sign > 0 ? bWall - 0.02 : bWall, wb1 = wb0 + 0.02;
+    F.lb(a0, a0 + len, wb0 + (sign > 0 ? 0.06 : -0.06), wb1 + (sign > 0 ? 0.06 : -0.06), fl + 1.0, fl + 1.8, M('#c8b48e'));
+    const tools = [['#c0392b', 0.04, 0.3], ['#2c3e50', 0.03, 0.22], ['#7f8c8d', 0.05, 0.35], ['#e67e22', 0.035, 0.25], ['#16a085', 0.03, 0.28], ['#7f8c8d', 0.02, 0.4]];
+    tools.forEach(([c, w, h], i) => { const a = a0 + 0.2 + i * (len - 0.4) / (tools.length - 1); F.lb(a - w, a + w, wb0 + (sign > 0 ? 0.08 : -0.1), wb0 + (sign > 0 ? 0.1 : -0.08), fl + 1.25, fl + 1.25 + h, M(c)); });
+    // Schraubstock
+    F.lb(a0 + len - 0.35, a0 + len - 0.15, b1 - (sign > 0 ? 0.15 : 0.55), b1 - (sign > 0 ? 0.0 : 0.4), fl + 0.9, fl + 1.02, M('#2c5d8a', { metalness: 0.4 }));
+  };
+  const shelf = (F, a0, a1, b0, b1) => {
+    const fl = GN + 0.03;
+    [[a0, b0], [a1 - 0.04, b0], [a0, b1 - 0.04], [a1 - 0.04, b1 - 0.04]].forEach(([a, b]) => F.lb(a, a + 0.04, b, b + 0.04, fl, fl + 1.9, steelM));
+    [0.1, 0.6, 1.1, 1.6].forEach((h, i) => {
+      F.lb(a0, a1, b0, b1, fl + h, fl + h + 0.025, M('#d4c7a8'));
+      const cols = ['#4a6fa5', '#b5651d', '#6c7a3b', '#9b59b6'];
+      for (let k = 0; k < 3; k++) { const aa = a0 + 0.05 + k * (a1 - a0 - 0.1) / 3; F.lb(aa, aa + (a1 - a0 - 0.2) / 3, b0 + 0.05, b1 - 0.05, fl + h + 0.025, fl + h + 0.3, M(cols[(i + k) % 4])); }
+    });
+    F.col(a0, a1, b0, b1, fl, fl + 1.9);
+  };
+  const bikeCols = ['#c0392b', '#2c3e50', '#27ae60', '#e1e4e8'];
+  /* Hagelschürze an der Einfahrt (zur Wetterseite Nordwest): senkrechte vergraute Lärchenlatten vom Dach bis
+     2,20 m über dem Carportboden. hTop(a) = Dachunterkante; Unterkante überall gleich hoch. */
+  const APRON = GN + 0.03 + 2.2;
+  const hailApron = (F, a0, a1, b, hTop) => {
+    const top = typeof hTop === 'function' ? hTop : () => hTop;
+    const s = new THREE.Shape([new THREE.Vector2(a0, APRON), new THREE.Vector2(a1, APRON), new THREE.Vector2(a1, top(a1) + 0.02), new THREE.Vector2(a0, top(a0) + 0.02)]);
+    const m = addMesh(new THREE.ExtrudeGeometry(s, { depth: 0.03, bevelEnabled: false }), boardMat(1), F.rg);
+    m.position.z = -b - 0.03;
+    const rail = F.lb(a0, a1, b + 0.03, b + 0.08, APRON, APRON + 0.07, M('#857f76', { roughness: 0.9 }), { roof: true });   // Abschlussleiste innen
+    return rail;
+  };
+  const roofSlab = (F, pts, h = 2.30) => { F.slab(pts, h + 0.02, h + 0.25, anth, { roof: true }); F.slab(pts, h, h + 0.02, soffit, { roof: true }); };
+  const makeGroup = () => { const g = new THREE.Group(); g.userData.toggle = true; g.visible = false; groups.site.add(g); return g; };
+
+  /* ===== Variante 1: Anbau am Haus, Flachdach in der Hausflucht =====
+     a entlang Plan +y (Westen) ab y −60, b entlang Plan +x (zum Haus) ab x −609.
+     Stellplätze a 0–3 / 3–6, Abstellraum a 6–9,2 × b 0,9–3 (Westen, rechteckig, 0,9 m zurückversetzt,
+     damit ca. 1 m Abstand zur Straße bleibt). Vor der Wärmepumpe bleibt 1,5 m frei, der Betonweg
+     (x −159 … −34) bleibt bis in den Garten offen und liegt bis y 885 unter dem Dach. */
+  {
+    const V = makeGroup(), F = frame(-609, -60, 0, 1, V);
+    const fl = GN + 0.03;
+    F.slab([[0, 0], [6.0, 0], [6.0, 0.85], [9.2, 0.85], [9.2, 4.5], [3.0, 4.5], [3.0, 5.99], [0, 5.99]], GN, fl, conc, { walk: true, shadow: false });
+    roofSlab(F, [[-0.25, -0.25], [6.15, -0.25], [6.15, 0.65], [9.45, 0.65], [9.45, 5.99], [-0.25, 5.99]]);
+    F.lb(-0.25, 8.26, 5.9, 5.99, 2.12, 2.30, anth);                          // Wandauflager an der Hausfront
+    F.post(0.1, 0.1, 2.30); F.post(6.05, 0.1, 2.30); F.post(0.1, 5.85, 2.30); F.post(9.3, 4.38, 2.30);
+    F.lb(-0.25, 6.15, 0.04, 0.16, 2.12, 2.30, anth);                         // Träger vorne
+    F.lb(9.24, 9.36, 4.3, 5.99, 2.12, 2.30, anth);                           // Träger über dem Betonweg zum Haus
+    // Abstellraum (Räder, Rasenmäher, kleine Werkbank)
+    const H = 2.30;
+    F.wallL('b', 0.9, 3.0, 6.05, 0.1, fl, H);                                // Ostwand zu Stellplatz 2
+    F.wallL('a', 6.0, 9.2, 0.95, 0.1, fl, H, [{ f: 6.8, t: 8.4, s: fl + 1.2, e: fl + 1.9 }]);   // Front mit Fenster
+    F.wallL('b', 0.9, 3.0, 9.15, 0.1, fl, H);                                // Westwand (Wetterseite)
+    F.wallL('a', 6.0, 9.2, 2.95, 0.1, fl, H, [{ f: 6.2, t: 7.1, s: fl, e: fl + 2.05 }]);        // Rückwand mit Tür
+    F.wallL('b', 3.0, 4.3, 9.25, 0.1, fl, H);                                // Wetterschutz bis zum Betonweg (Weg in den Garten bleibt offen)
+    // Inhalt
+    [1.25, 1.65].forEach((b, i) => F.put(makeBike(bikeCols[i]), 8.2, b, fl + 0.01, 0));
+    F.put(makeMower(), 6.55, 1.9, fl, Math.PI / 2);
+    workbench(F, 7.5, 1.6, 2.9, -1);
+    hailApron(F, -0.25, 6.15, -0.22, 2.30);
+    V.userData.carSpots = [[F, 1.5, 3.2, 'oct'], [F, 4.5, 2.5, 'p208']];
+    V.userData.fenceCut = 0;
+    carport.variants.push(V);
+  }
+
+  /* ===== Variante 2: parallel zur Straße, Flachdach, 1 m Abstand ===== */
+  const s2 = 1030;                                   // Westende bei s 18,5 m: Betonweg an der Wärmepumpe bleibt frei
+  {
+    const V = makeGroup(), F = frame(R0[0] + u[0] * s2, R0[1] + u[1] * s2, u[0], u[1], V);
+    const fl = GN + 0.03, H = 2.30;
+    F.slab([[0, 1.0], [8.2, 1.0], [8.2, 7.0], [0, 7.0]], GN, fl, conc, { walk: true, shadow: false });
+    roofSlab(F, [[-0.3, 0.75], [8.45, 0.75], [8.45, 7.3], [-0.3, 7.3]]);
+    F.post(0.12, 1.12, H); F.post(0.12, 6.88, H); F.post(3.0, 6.88, H);
+    F.lb(-0.3, 6.0, 1.06, 1.18, 2.08, H, anth); F.lb(-0.3, 6.0, 6.82, 6.94, 2.08, H, anth);    // Träger
+    // Raum für Räder und Rasenmäher an der Westseite (a 6,0–8,2)
+    F.wallL('b', 1.0, 7.0, 6.05, 0.1, fl, H);
+    F.wallL('a', 6.0, 8.2, 1.05, 0.1, fl, H);
+    F.wallL('b', 1.0, 7.0, 8.15, 0.1, fl, H);                                // Westwand
+    F.wallL('a', 6.0, 8.2, 6.95, 0.1, fl, H, [{ f: 6.75, t: 7.6, s: fl, e: fl + 2.05 }]);       // Tür zur Haustür hin
+    [6.45, 6.9, 7.35, 7.8].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 2.3, fl + 0.01, Math.PI / 2));
+    F.put(makeMower(), 7.85, 5.6, fl, Math.PI / 2);
+    shelf(F, 6.15, 6.65, 4.4, 6.0);
+    walkway(V, F, 8.45, 5.45, 7.25);
+    hailApron(F, -0.3, 6.0, 0.78, 2.30);
+    V.userData.carSpots = [[F, 1.5, 3.95, 'oct'], [F, 4.5, 3.8, 'p208']];
+    carport.variants.push(V);
+  }
+
+  /* ===== Variante 3: Pultdach, Werkstatt an der Westseite =====
+     8,8 × 6 m (a 0–8,8). Pultdach 7°, hoch an der geschlossenen Westseite (Wetterseite), niedrig im Osten:
+     Schnee rutscht nach Osten ab, nicht vor die Einfahrt und nicht auf den Weg zur Haustür.
+     Abstand Dachkante – Grenze zu 1004/4 ≥ 2 m (Oö. BauTG § 40 Z 2), deshalb beginnt es erst bei s 9,7 m. */
+  const s3 = 970;
+  {
+    const V = makeGroup(), F = frame(R0[0] + u[0] * s3, R0[1] + u[1] * s3, u[0], u[1], V);
+    const fl = GN + 0.03, wood = M('#8b877f', { roughness: 0.9 });
+    const ang = 7 * Math.PI / 180, tn = Math.tan(ang), hU = a => 2.30 + (a + 0.1) * tn;   // Dachunterkante bei a
+    F.slab([[0, 1.0], [8.8, 1.0], [8.8, 7.0], [0, 7.0]], GN, fl, conc, { walk: true, shadow: false });
+    // Dach: Stehfalzblech anthrazit, a −0,1 … 9,05, b 0,75 … 7,25
+    const seam = (() => { const c = document.createElement('canvas'); c.width = 16; c.height = 64; const k = c.getContext('2d');
+      k.fillStyle = '#4a4e53'; k.fillRect(0, 0, 16, 64); k.fillStyle = '#5d6268'; k.fillRect(0, 0, 16, 4); k.fillStyle = '#2f3236'; k.fillRect(0, 4, 16, 2);
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1, 6.5 / 0.5); return t; })();
+    const Lr = 9.15 / Math.cos(ang), ac = (-0.1 + 9.05) / 2;
+    const roof = addMesh(new THREE.BoxGeometry(Lr, 0.12, 6.5), [anth, anth, M('#ffffff', { map: seam, roughness: 0.45, metalness: 0.35 }), soffit, anth, anth], F.rg);
+    roof.position.set(ac, hU(ac) + 0.06, -(0.75 + 6.5 / 2)); roof.rotation.z = ang;
+    F.lb(-0.22, -0.1, 0.75, 7.25, 2.2, 2.3, anth, { roof: true });                   // Dachrinne an der Ostseite
+    // Pfetten vorne und hinten (geneigt), Steher
+    // stützenfrei zwischen den Autos: Brettschichtholz-Pfetten 16/36 cm spannen 5,7 m vom Eck-Steher bis zur Werkstattwand
+    [1.1, 6.9].forEach(b => {
+      const m = addMesh(new THREE.BoxGeometry(Lr, 0.36, 0.16), wood, F.rg);
+      m.position.set(ac, hU(ac) - 0.18, -b); m.rotation.z = ang;
+    });
+    [[0.1, 1.1], [0.1, 6.9]].forEach(([a, b]) => F.post(a, b, hU(a) - 0.36, wood, 0.16));
+    // Werkstatt a 5,8–8,8 (3 × 6 m): Wände bis unters Dach, Werkbank unter dem Fenster zur Straße, Räder, Mäher, Regal
+    const h0 = hU(5.8);
+    F.wallL('b', 1.0, 7.0, 5.85, 0.1, fl, hU(5.85));
+    F.wallL('b', 1.0, 7.0, 8.75, 0.1, fl, hU(8.75));                         // Westwand (Wetterseite), geschlossen
+    F.wallL('a', 5.8, 8.8, 1.05, 0.1, fl, h0, [{ f: 6.4, t: 8.4, s: fl + 1.05, e: fl + 1.95 }]);
+    F.wallL('a', 5.8, 8.8, 6.95, 0.1, fl, h0, [{ f: 6.1, t: 7.0, s: fl, e: fl + 2.05 }]);          // Tür zur Haustür hin
+    [1.05, 6.95].forEach(b => {                                               // Dreieck zwischen Wand und schrägem Dach
+      const s = new THREE.Shape([new THREE.Vector2(5.8, h0), new THREE.Vector2(8.8, h0), new THREE.Vector2(8.8, hU(8.8))]);
+      const m = addMesh(new THREE.ExtrudeGeometry(s, { depth: 0.1, bevelEnabled: false }), boardMat(1), F.g); m.position.z = -b - 0.05;
+    });
+    workbench(F, 6.3, 2.2, 1.1, 1, false);
+    [8.4, 8.0, 7.6].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 4.6, fl + 0.01, Math.PI / 2));
+    F.put(makeMower(), 8.25, 6.35, fl, 0);
+    shelf(F, 5.95, 6.45, 3.6, 5.6);
+    walkway(V, F, 9.05, 4.5, 7.2);
+    hailApron(F, -0.1, 5.8, 0.78, hU);
+    V.userData.carSpots = [[F, 1.45, 3.95, 'oct'], [F, 4.35, 3.8, 'p208']];
+    carport.variants.push(V);
+  }
+  /* ===== Variante 4: kompaktes Carport an der Straße + Werkstatt am Platz des Unterstands =====
+     Carport 6 × 6 m parallel zur Straße (1 m Abstand), geschlossene Westwand, überdachter Weg zur Haustür.
+     Statt des Fahrradunterstands eine Werkstatt 3,7 × 4,1 m vor dem Container (Plan x 20–390, y −450…−40). */
+  const s4 = 1250;
+  {
+    const V = makeGroup(), F = frame(R0[0] + u[0] * s4, R0[1] + u[1] * s4, u[0], u[1], V);
+    const fl = GN + 0.03, H = 2.30;
+    F.slab([[0, 1.0], [6.0, 1.0], [6.0, 7.0], [0, 7.0]], GN, fl, conc, { walk: true, shadow: false });
+    roofSlab(F, [[-0.3, 0.75], [6.25, 0.75], [6.25, 7.3], [-0.3, 7.3]]);
+    F.post(0.12, 1.12, H); F.post(0.12, 6.88, H); F.post(3.0, 6.88, H);
+    F.lb(-0.3, 6.0, 1.06, 1.18, 2.08, H, anth); F.lb(-0.3, 6.0, 6.82, 6.94, 2.08, H, anth);
+    F.wallL('b', 1.0, 7.0, 6.0, 0.1, fl, H);                                 // geschlossene Westwand
+    walkway(V, F, 6.25, 3.5, 7.25);
+    hailApron(F, -0.3, 6.0, 0.78, 2.30);
+    V.userData.carSpots = [[F, 1.5, 3.95, 'oct'], [F, 4.5, 3.8, 'p208']];
+    V.userData.noShelter = true;
+    // Werkstatt: a entlang Plan +y ab y −450, b entlang Plan +x ab x 20
+    /* Werkstatt liegt 0,8 m von der Grenze zu 1004/4 → nur zulässig nach Oö. BauTG § 41 Abs. 1 Z 5:
+       keine Öffnungen zur Grenze, Tür/Fenster in der Nordwand ≥ 1 m von der Grenze, Traufe ≤ 3 m über dem Fußboden
+       (hier ca. 2,8 m), Länge aller Bauten im Abstand zu 1004/4 ≤ 15 m (Container 6,3 m + Werkstatt 4,1 m). */
+    const W = frame(20, -450, 0, 1, V), WH = 2.15;
+    W.slab([[0, 0], [4.1, 0], [4.1, 3.7], [0, 3.7]], GN, fl, M('#9c7d58', { roughness: 0.9 }), { walk: true, shadow: false });
+    W.wallL('a', 0, 4.1, 0.05, 0.1, fl, WH, [{ f: 1.4, t: 2.4, s: fl, e: fl + 2.05 }, { f: 2.8, t: 3.8, s: fl + 1.0, e: fl + 1.9 }]);   // Nordseite: Tür + Fenster
+    W.wallL('b', 0, 3.7, 0.05, 0.1, fl, WH);                                 // Ostseite (Nachbar)
+    W.wallL('a', 0, 4.1, 3.65, 0.1, fl, WH);                                 // zum Container
+    W.wallL('b', 0, 3.7, 4.05, 0.1, fl, WH);                                 // zum Haus
+    const rp = [[-0.25, -0.3], [4.38, -0.3], [4.38, 3.75], [-0.25, 3.75]];
+    W.slab(rp, WH + 0.02, WH + 0.2, anth, { roof: true }); W.slab(rp, WH, WH + 0.02, soffit, { roof: true });
+    workbench(W, 0.3, 2.2, 3.6, -1);
+    [0.3, 0.62, 0.94, 1.26].forEach((a, i) => W.put(makeBike(bikeCols[i]), a, 1.3, fl + 0.01, Math.PI / 2));
+    W.put(makeMower(), 3.55, 1.0, fl, Math.PI / 2);
+    shelf(W, 3.5, 3.95, 1.75, 2.9);
+    carport.variants.push(V);
+  }
+  // Ohne Carport (Ist): Autos auf dem Schotter vor dem Haus, gleich wie bei Variante 1
+  {
+    const g = new THREE.Group(); groups.site.add(g);
+    const F = frame(-609, -60, 0, 1, g);
+    carport.variants[0] = { userData: { carSpots: [[F, 1.5, 2.2, 'oct'], [F, 4.5, 1.5, 'p208']] } };   // 1 m weiter zur Straße als bei Var. 1
+  }
+  carport.anth = anth;
+}
+
+/* Autos (vereinfachte Modelle in Originalmaßen): Skoda Octavia Combi grau, Peugeot 208 lila. */
+function makeCar({ L, W, H, wb, fo, color, kombi, plate, grille }) {
+  const g = new THREE.Group(); g.userData.toggle = true;
+  const paint = M(color, { roughness: 0.32, metalness: 0.5 });
+  const glass = M('#1b232b', { roughness: 0.12, metalness: 0.7 });
+  const black = M('#151618', { roughness: 0.7 });
+  const chrome = M('#c9ced3', { roughness: 0.25, metalness: 0.9 });
+  const xf = L / 2, xr = -L / 2, hood = kombi ? 1.12 : 1.0;
+  const ext = (pts, w, m, bevel = 0.035) => {
+    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(s, { depth: w - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2 });
+    geo.translate(0, 0, -(w - 2 * bevel) / 2);
+    const mesh = new THREE.Mesh(geo, m); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh;
+  };
+  const bx = (x0, x1, y0, y1, w, m, z = 0) => { const k = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0), y1 - y0, w), m); k.position.set((x0 + x1) / 2, (y0 + y1) / 2, z); k.castShadow = true; g.add(k); return k; };
+  // Karosserie bis zur Gürtellinie
+  ext([[xr + 0.06, 0.24], [xf - 0.14, 0.24], [xf - 0.04, 0.4], [xf - 0.03, 0.62], [xf - 0.32, 0.78], [xf - hood, 0.93], [xr + 0.08, kombi ? 0.98 : 0.99], [xr + 0.04, 0.62]], W, paint);
+  // Fensterband (dunkles Glas)
+  const gTop = H - 0.07, rear = kombi ? 0.16 : 0.46;
+  ext([[xf - hood + 0.02, 0.9], [xf - hood - 0.72, gTop], [xr + rear, gTop - 0.01], [xr + (kombi ? 0.07 : 0.16), 0.95]], W - 0.2, glass, 0.025);
+  // Dach und Säulen in Wagenfarbe
+  bx(xf - hood - 0.78, xr + rear + 0.04, gTop - 0.02, H, W - 0.24, paint);
+  const pillar = (x, w) => bx(x - w / 2, x + w / 2, 0.95, gTop, W - 0.16, paint);
+  pillar((xf - hood - 0.7 + xr + rear) / 2 + (kombi ? 0.25 : 0.15), 0.1);       // B-Säule
+  if (kombi) pillar(xr + 0.62, 0.12);                                           // C-Säule (Kombi hat ein drittes Seitenfenster)
+  else pillar(xr + rear + 0.2, 0.38);
+  if (kombi) [-1, 1].forEach(sz => bx(xf - hood - 0.6, xr + 0.25, H, H + 0.04, 0.035, chrome, sz * (W / 2 - 0.2)));   // Dachreling
+  // Räder
+  const fa = xf - fo, ra = fa - wb;
+  [fa, ra].forEach(x => [-1, 1].forEach(sz => {
+    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.315, 0.315, 0.21, 22), black); w.rotation.x = Math.PI / 2; w.position.set(x, 0.315, sz * (W / 2 - 0.12)); w.castShadow = true; g.add(w);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 18), chrome); hub.rotation.x = Math.PI / 2; hub.position.set(x, 0.315, sz * (W / 2 - 0.005)); g.add(hub);
+    bx(x - 0.42, x + 0.42, 0.24, 0.27, 0.06, black, sz * (W / 2 - 0.01));       // Radlauf-Schutz
+  }));
+  // Licht, Kühlergrill, Kennzeichen, Spiegel
+  const lamp = M('#f4f6f8', { emissive: '#d8e4ee', emissiveIntensity: 0.25, roughness: 0.2 }), tail = M('#b3121b', { emissive: '#5a0006', emissiveIntensity: 0.4, roughness: 0.3 });
+  [-1, 1].forEach(sz => {
+    bx(xf - 0.12, xf + 0.01, 0.62, 0.71, 0.34, lamp, sz * (W / 2 - 0.27));
+    bx(xr - 0.01, xr + 0.08, kombi ? 0.78 : 0.82, kombi ? 0.9 : 0.94, 0.3, tail, sz * (W / 2 - 0.22));
+    bx(xf - hood - 0.05, xf - hood + 0.12, 0.98, 1.08, 0.18, paint, sz * (W / 2 + 0.06));
+  });
+  bx(xf - 0.05, xf + 0.02, 0.42, 0.6, grille === 'wide' ? 1.1 : 0.62, black);
+  if (grille !== 'wide') bx(xf - 0.03, xf + 0.025, 0.42, 0.6, 0.66, chrome).scale.set(1, 1, 1.0);
+  const plateTex = (() => {
+    const c = document.createElement('canvas'); c.width = 256; c.height = 56; const k = c.getContext('2d');
+    k.fillStyle = '#ffffff'; k.fillRect(0, 0, 256, 56); k.fillStyle = '#c8102e'; k.fillRect(0, 0, 256, 7); k.fillRect(0, 49, 256, 7);
+    k.fillStyle = '#111'; k.font = 'bold 34px Arial, sans-serif'; k.textAlign = 'center'; k.textBaseline = 'middle'; k.fillText(plate, 128, 29);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+  })();
+  const plateM = M('#ffffff', { map: plateTex, roughness: 0.4 });
+  const pf = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pf.position.set(xf + 0.03, 0.36, 0); pf.rotation.y = Math.PI / 2; g.add(pf);
+  const pr = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pr.position.set(xr - 0.02, 0.5, 0); pr.rotation.y = -Math.PI / 2; g.add(pr);
+  // Kollision: kleine Kästchen über die Grundfläche
+  for (let x = xr + 0.2; x < xf; x += 0.45) for (let z = -W / 2 + 0.2; z < W / 2; z += 0.45) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.1, 0.42), mat.rail); c.position.set(x, 0.75, z); c.visible = false; g.add(c); colliders.push(c);
+  }
+  return g;
+}
+{
+  const cars = new THREE.Group(); cars.userData.toggle = true; cars.visible = false; groups.site.add(cars);
+  carport.cars = cars;
+  carport.oct = makeCar({ L: 4.69, W: 1.83, H: 1.47, wb: 2.69, fo: 0.92, color: '#8e959b', kombi: true, plate: 'GM 471 OC' });
+  carport.p208 = makeCar({ L: 4.06, W: 1.75, H: 1.43, wb: 2.54, fo: 0.83, color: '#6d3f8c', kombi: false, plate: 'GM 208 LI', grille: 'wide' });
+  carport.oct.userData.toggle = carport.p208.userData.toggle = false;
+  cars.add(carport.oct, carport.p208);
+}
+function placeCars(v) {
+  const spots = carport.variants[v].userData.carSpots;
+  spots.forEach(([F, a, b, key]) => {
+    const car = carport[key], [px, py] = F.P(a, b), [dx, dy] = F.dir, hx = dy, hy = -dx;   // Nase zum Haus
+    car.position.set(X(px), GN + (v ? 0.03 : 0), Z(py)); car.rotation.y = Math.atan2(-hy, hx);
+  });
+}
+function setCarport(v) {
+  carport.current = v;
+  carport.variants.forEach((V, i) => { if (i && V) V.visible = i === v; });
+  // Variante 4 steht am Platz des Fahrradunterstands: diesen dabei ausblenden, danach wie vorher
+  if (carport.variants[v].userData.noShelter) { if (carport.shelterBefore === undefined) carport.shelterBefore = shelterG.visible; shelterG.visible = false; }
+  else if (carport.shelterBefore !== undefined) { shelterG.visible = carport.shelterBefore; carport.shelterBefore = undefined; }
+  placeCars(v);
+  refreshActive();
+}
+
+/* ---------- Raumbeschriftung (Flächen laut Polierplan) ---------- */
+const rooms = [
+  { floor: 'eg', name: 'WC', area: '1,95 m²', r: [29, 148, 29, 230] },
+  { floor: 'eg', name: 'Windfang', area: '9,55 m²', r: [163, 449, 250, 380], extra: [[29, 163, 245, 380]] },
+  { floor: 'eg', name: 'Speisekammer', area: '2,03 m²', r: [459, 558, 100, 236], extra: [[459, 558, 29, 100]] },
+  { floor: 'eg', name: 'Stiege', area: '16 Stufen', r: [327, 558, 29, 246] },
+  { floor: 'eg', name: 'Technik', area: '7,61 m²', r: [29, 268, 396, 728] },
+  { floor: 'eg', name: 'Wohnen', area: 'Küche/Wohnen/Essen 39,88 m²', r: [574, 988, 29, 396], extra: [[466, 574, 250, 396]] },
+  { floor: 'eg', name: 'Küche / Essen', area: '', r: [285, 988, 396, 728] },
+  { floor: 'og', name: 'Bad', area: '10,74 m²', r: [29, 318, 29, 418] },
+  { floor: 'og', name: 'Stiege', area: '', r: [327, 558, 29, 246] },
+  { floor: 'og', name: 'Vorraum', area: '4,08 m²', r: [332, 560, 246, 418] },
+  { floor: 'og', name: 'Schlafzimmer', area: '15,96 m²', r: [578, 988, 29, 418] },
+  { floor: 'og', name: 'Kinderzimmer West', area: '11,93 m²', r: [29, 437, 436, 728] },
+  { floor: 'og', name: 'Kinderzimmer Ost', area: '15,61 m²', r: [455, 988, 436, 728] },
+];
+const labels = { eg: [], og: [] };
+rooms.forEach(rm => {
+  if (!rm.area && rm.name !== 'Küche / Essen') return;
+  if (rm.name === 'Stiege' && rm.floor === 'og') return;
+  const el = document.createElement('div');
+  el.className = 'label';
+  el.innerHTML = `${rm.name}${rm.area ? `<span>${rm.area}</span>` : ''}`;
+  const o = new CSS2DObject(el);
+  const [x0, x1, y0, y1] = rm.r;
+  o.position.set(X((x0 + x1) / 2), rm.floor === 'eg' ? 1.0 : 3.96, Z((y0 + y1) / 2));
+  o.visible = false;
+  scene.add(o);
+  labels[rm.floor].push(o);
+});
+
+/* ---------- Ansichten ---------- */
+let view = 'aussen';
+function setView(v) {
+  view = v;
+  groups.roof.visible = v === 'aussen';
+  groups.og.visible = v !== 'eg';
+  carport.roofs.forEach(r => r.visible = v === 'aussen');
+  labels.eg.forEach(l => l.visible = v === 'eg');
+  labels.og.forEach(l => l.visible = v === 'og');
+  ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).setAttribute('aria-pressed', String(k === v)));
+}
+['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).addEventListener('click', () => {
+  setView(k);
+  if (k !== 'aussen') { camera.position.set(3, 15.5, 10.5); controls.target.set(0, k === 'og' ? 3 : 0.3, 0.6); }
+  else homeView();
+}));
+
+/* ---------- Rundgang ---------- */
+let walking = false;
+const player = { x: 0, z: 0, feet: 0, eye: 1.62, yaw: 0, pitch: 0, camY: 1.6 };
+const down = new THREE.Vector3(0, -1, 0);
+const ray = new THREE.Raycaster();
+let boxes = [];
+
+// ausgeblendete Gruppen (Carport-Varianten, Autos, Unterstand) zählen weder als Hindernis noch als Boden
+const isActive = m => { for (let o = m; o; o = o.parent) if (o.userData.toggle && !o.visible) return false; return true; };
+let activeWalk = walkables;
+function buildColliderBoxes() {
+  scene.updateMatrixWorld(true);
+  boxes = colliders.filter(isActive).map(m => new THREE.Box3().setFromObject(m));
+  activeWalk = walkables.filter(isActive);
+}
+function refreshActive() { if (walking) buildColliderBoxes(); }
+function groundAt(x, z, feet) {
+  ray.set(new THREE.Vector3(x, feet + 0.5, z), down);
+  ray.far = 30;
+  const hit = ray.intersectObjects(activeWalk, false)[0];
+  return hit ? hit.point.y : null;
+}
+const R = 0.22;
+function blockedAt(x, z, feet) {
+  for (const b of boxes) {
+    if (b.max.y <= feet + 0.32 || b.min.y >= feet + 1.8) continue;
+    const cx = Math.max(b.min.x, Math.min(x, b.max.x)), cz = Math.max(b.min.z, Math.min(z, b.max.z));
+    const dx = x - cx, dz = z - cz;
+    if (dx * dx + dz * dz < R * R) return true;
+  }
+  return false;
+}
+function tryMove(nx, nz) {
+  const g = groundAt(nx, nz, player.feet);
+  if (g === null || g - player.feet > 0.42) return false;
+  if (blockedAt(nx, nz, Math.max(g, player.feet))) return false;
+  player.x = nx; player.z = nz;
+  if (g >= player.feet) player.feet = g; else player.feet = Math.max(g, player.feet - 0.12);
+  return true;
+}
+
+// yaw: 0 = Blick in Planrichtung „oben“ (−z), +π/2 = nach links (Westen), −π/2 = nach rechts (Osten)
+const spots = {
+  eingang: { x: -120, y: 313, feet: STRIP, yaw: -Math.PI / 2 },
+  wohnen: { x: 640, y: 340, feet: 0, yaw: -0.75 },
+  kueche: { x: 640, y: 520, feet: 0, yaw: Math.PI / 2 },
+  og: { x: 450, y: 340, feet: 2.96, yaw: -Math.PI / 2 },
+  balkon: { x: 800, y: -150, feet: 2.96, yaw: 0 },
+  terrasse: { x: 1150, y: 560, feet: 0, yaw: Math.PI / 2 },
+  carport: { x: -1150, y: 150, feet: GN, yaw: -1.8 },
+};
+function jump(key) {
+  const s = spots[key];
+  player.x = X(s.x); player.z = Z(s.y); player.feet = s.feet; player.camY = s.feet + player.eye;
+  player.yaw = s.yaw; player.pitch = 0;
+}
+
+const panel = document.getElementById('panel');
+const hud = document.getElementById('hud');
+const joy = document.getElementById('joy');
+const isTouch = matchMedia('(pointer: coarse)').matches;
+
+function startWalk() {
+  walking = true;
+  setView('aussen');
+  siteLabels.forEach(l => l.visible = false);
+  controls.enabled = false;
+  camera.fov = 72; camera.updateProjectionMatrix();
+  buildColliderBoxes();
+  jump('eingang');
+  document.getElementById('walkBtn').textContent = 'Rundgang beenden';
+  document.getElementById('walkUi').hidden = false;
+  document.getElementById('orbitUi').hidden = true;
+  document.getElementById('orbitHelp').hidden = true;
+  hud.hidden = false; joy.hidden = !isTouch;
+}
+function stopWalk() {
+  walking = false;
+  siteLabels.forEach(l => l.visible = showSiteLabels);
+  controls.enabled = true;
+  camera.fov = 42; camera.updateProjectionMatrix();
+  homeView();
+  document.getElementById('walkBtn').textContent = 'Rundgang starten';
+  document.getElementById('walkUi').hidden = true;
+  document.getElementById('orbitUi').hidden = false;
+  document.getElementById('orbitHelp').hidden = false;
+  hud.hidden = true; joy.hidden = true;
+}
+document.getElementById('walkBtn').addEventListener('click', () => walking ? stopWalk() : startWalk());
+
+// Carport-Planung
+const cpTexts = [
+  '<b>Ist-Zustand</b> ohne Carport. Mit „Autos“ siehst du, wo die beiden heute auf dem Schotter stehen könnten.',
+  '<b>Anbau am Haus:</b> Flachdach in der Hausflucht, 9,2 × 6 m, reicht direkt über die Haustür – trocken vom Auto ins Haus. Abstellraum 3,2 × 2 m im Westen (2 Räder, Mäher, Werkbank). Betonweg an der Wärmepumpe vorbei in den Garten bleibt frei und ist bis zur Hausecke überdacht. Einfahrt schräg zur Straße: 1 m (Westecke) bis 6,7 m (Osten) → mehr Schnee räumen.',
+  '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
+  '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
+  '<b>Carport + Werkstatt am Unterstand-Platz:</b> Carport nur 6 × 6 m, 1 m hinter der Grundgrenze, geschlossene Westwand, überdachter Gang zur Haustür. Statt des Fahrradunterstands eine Werkstatt 3,7 × 4,1 m vor dem Container: Werkbank, 4 Räder, Mäher, Regal. Der Weg Carport → Werkstatt (ca. 4 m) ist nicht überdacht. Die Werkstatt steht 0,8 m von der Grenze zu 1004/4 – geht nur als Ausnahme (keine Öffnung zur Grenze, Traufe unter 3 m).',
+];
+const cpBtns = document.querySelectorAll('[data-cp]');
+function showCarport(v) {
+  setCarport(v);
+  cpBtns.forEach(b => b.setAttribute('aria-pressed', String(+b.dataset.cp === v)));
+  document.getElementById('cpInfo').innerHTML = cpTexts[v] + (v ? ' <b>Hagelschürze</b> an der Einfahrt (Wetterseite Nordwest) bis 2,2 m über dem Boden: Autos auch bei Schräghagel (45°) geschützt.' : '');
+  document.getElementById('tShelter').setAttribute('aria-pressed', String(shelterG.visible));
+}
+function carportView() {
+  if (walking) { jump('carport'); return; }
+  camera.position.set(X(-1900), 9, Z(1100)); controls.target.set(X(-600), 0.5, Z(200));
+}
+cpBtns.forEach(b => b.addEventListener('click', () => {
+  showCarport(+b.dataset.cp);                         // nur umschalten, Kamera und Zoom bleiben
+}));
+const toggleBtn = (id, obj) => {
+  const b = document.getElementById(id);
+  b.addEventListener('click', () => { obj.visible = !obj.visible; b.setAttribute('aria-pressed', String(obj.visible)); refreshActive(); });
+};
+toggleBtn('tCars', carport.cars);
+toggleBtn('tShelter', shelterG);
+document.getElementById('cpView').addEventListener('click', carportView);
+// Grundstücksbezeichnungen (Parzellennummern), standardmäßig aus
+let showSiteLabels = false;
+siteLabels.forEach(l => l.visible = false);
+document.getElementById('tLabels').addEventListener('click', e => {
+  showSiteLabels = !showSiteLabels;
+  e.currentTarget.setAttribute('aria-pressed', String(showSiteLabels));
+  if (!walking) siteLabels.forEach(l => l.visible = showSiteLabels);
+});
+showCarport(1);                                    // Startansicht: Variante 1 mit Autos und Fahrradunterstand
+carport.cars.visible = true; document.getElementById('tCars').setAttribute('aria-pressed', 'true');
+document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jump(b.dataset.jump)));
+document.getElementById('toggle').addEventListener('click', e => {
+  const min = panel.classList.toggle('min');
+  e.currentTarget.textContent = min ? '+' : '–';
+  e.currentTarget.setAttribute('aria-label', min ? 'Panel ausklappen' : 'Panel einklappen');
+});
+// am Handy startet das Panel eingeklappt
+if (matchMedia('(max-width: 520px)').matches) {
+  panel.classList.add('min');
+  const tg = document.getElementById('toggle'); tg.textContent = '+'; tg.setAttribute('aria-label', 'Panel ausklappen');
+}
+
+// Tastatur
+const keys = new Set();
+addEventListener('keydown', e => { if (walking) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); } });
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+
+// Umschauen per Ziehen
+let look = null;
+renderer.domElement.addEventListener('pointerdown', e => {
+  if (!walking) return;
+  look = { id: e.pointerId, x: e.clientX, y: e.clientY };
+  renderer.domElement.setPointerCapture(e.pointerId);
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  if (!walking || !look || look.id !== e.pointerId) return;
+  const k = e.pointerType === 'touch' ? 0.006 : 0.0045;
+  player.yaw -= (e.clientX - look.x) * k;
+  player.pitch = Math.max(-1.3, Math.min(1.3, player.pitch + (e.clientY - look.y) * k));
+  look.x = e.clientX; look.y = e.clientY;
+});
+const endLook = e => { if (look && look.id === e.pointerId) look = null; };
+renderer.domElement.addEventListener('pointerup', endLook);
+renderer.domElement.addEventListener('pointercancel', endLook);
+
+// Joystick
+const knob = document.getElementById('knob');
+let joyVec = { x: 0, y: 0 }, joyId = null;
+joy.addEventListener('pointerdown', e => { joyId = e.pointerId; joy.setPointerCapture(e.pointerId); moveJoy(e); });
+joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) moveJoy(e); });
+const endJoy = e => { if (e.pointerId === joyId) { joyId = null; joyVec = { x: 0, y: 0 }; knob.style.transform = ''; } };
+joy.addEventListener('pointerup', endJoy); joy.addEventListener('pointercancel', endJoy);
+function moveJoy(e) {
+  const r = joy.getBoundingClientRect();
+  let dx = (e.clientX - r.left - r.width / 2) / (r.width / 2), dy = (e.clientY - r.top - r.height / 2) / (r.height / 2);
+  const len = Math.hypot(dx, dy); if (len > 1) { dx /= len; dy /= len; }
+  joyVec = { x: dx, y: dy };
+  knob.style.transform = `translate(${dx * 36}px, ${dy * 36}px)`;
+}
+
+function roomName() {
+  const xc = (player.x + 5.085) * 100, yc = (player.z + 3.785) * 100;
+  const inR = ([x0, x1, y0, y1]) => xc >= x0 && xc <= x1 && yc >= y0 && yc <= y1;
+  if (xc < -9 || xc > 1026 || yc < -9 || yc > 766) {
+    if (player.feet > 2.5) return ['Balkon', 'Obergeschoss'];
+    if (inR([1026, 1376, -9, 1116]) || inR([617, 1026, 766, 1116])) return ['Terrasse', 'Außen'];
+    if (inR([-159, 617, 766, 916]) || inR([-159, -9, 240, 916])) return ['Betonweg', 'Außen'];
+    if (xc < -9) return ['Vor dem Haus', 'Außen'];
+    return ['Garten', 'Außen'];
+  }
+  const floor = player.feet > 2.5 ? 'og' : 'eg';
+  if (inR([327, 558, 29, 246]) && player.feet > 0.1 && player.feet < 2.9) return ['Stiege', `${Math.round(player.feet / 0.185)}. Stufe`];
+  for (const rm of rooms) if (rm.floor === floor && (inR(rm.r) || (rm.extra || []).some(inR))) return [rm.name.replace(' / ', '/'), floor === 'eg' ? 'Erdgeschoss' : 'Obergeschoss'];
+  return ['Durchgang', floor === 'eg' ? 'Erdgeschoss' : 'Obergeschoss'];
+}
+let lastRoom = '';
+// Größe
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h); labelRenderer.setSize(w, h);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+// Startansicht; auf schmalen (Hochformat-)Bildschirmen weiter weg, damit Haus und Carport ganz zu sehen sind
+function homeView() {
+  camera.position.set(-23.49, 23, 22.66); controls.target.set(-4.59, 0, 3.22);
+  if (camera.aspect < 1.4) camera.position.sub(controls.target).multiplyScalar(Math.min(1.9, 1.35 / camera.aspect)).add(controls.target);
+}
+homeView();
+setView('aussen');
+
+const clock = new THREE.Clock();
+renderer.setAnimationLoop(() => {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (walking) {
+    let f = 0, s = 0;
+    if (keys.has('KeyW') || keys.has('ArrowUp')) f += 1;
+    if (keys.has('KeyS') || keys.has('ArrowDown')) f -= 1;
+    if (keys.has('KeyA')) s -= 1;
+    if (keys.has('KeyD')) s += 1;
+    if (keys.has('ArrowLeft')) player.yaw += 1.8 * dt;
+    if (keys.has('ArrowRight')) player.yaw -= 1.8 * dt;
+    f -= joyVec.y; s += joyVec.x;
+    const len = Math.hypot(f, s);
+    if (len > 0.05) {
+      const speed = (keys.has('ShiftLeft') || keys.has('ShiftRight') ? 3.2 : 1.5) * Math.min(1, len) / len;
+      const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+      const rx = Math.cos(player.yaw), rz = -Math.sin(player.yaw);
+      const dx = (fx * f + rx * s) * speed * dt, dz = (fz * f + rz * s) * speed * dt;
+      // in kleinen Schritten, mit Gleiten an Wänden
+      const n = Math.ceil(Math.hypot(dx, dz) / 0.05) || 1;
+      for (let i = 0; i < n; i++) {
+        if (!tryMove(player.x + dx / n, player.z + dz / n)) { tryMove(player.x + dx / n, player.z) || tryMove(player.x, player.z + dz / n); }
+      }
+    } else {
+      const g = groundAt(player.x, player.z, player.feet);
+      if (g !== null && g < player.feet) player.feet = Math.max(g, player.feet - 0.12);
+    }
+    player.camY += (player.feet + player.eye - player.camY) * Math.min(1, dt * 12);
+    camera.position.set(player.x, player.camY, player.z);
+    camera.rotation.set(-player.pitch, player.yaw, 0, 'YXZ');
+    const [name, sub] = roomName();
+    const txt = name + '|' + sub;
+    if (txt !== lastRoom) { lastRoom = txt; hud.innerHTML = `${name}${sub ? `<small>${sub}</small>` : ''}`; }
+  } else {
+    controls.update();
+  }
+  updateDoors(dt);
+  renderer.render(scene, camera);
+  labelRenderer.render(scene, camera);
+});
+</script>
+
+</body></html>
