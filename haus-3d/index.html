@@ -1,4 +1,4 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style><link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23cfe0ec'/%3E%3Ccircle cx='50' cy='14' r='7' fill='%23ffd45e'/%3E%3Cpath d='M0 50h64v0c0 7.7-6.3 14-14 14H14C6.3 64 0 57.7 0 50z' fill='%237f9e5a'/%3E%3Crect x='15' y='31' width='34' height='23' fill='%23f4efe2'/%3E%3Cpath d='M10 33 32 15l22 18z' fill='%233b3e42'/%3E%3Crect x='21' y='37' width='8' height='8' fill='%238cc4e3'/%3E%3Crect x='35' y='40' width='8' height='14' fill='%238a5a2b'/%3E%3C/svg%3E"></head><body>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Haus Rundgang 3D</title>
@@ -45,7 +45,8 @@
     max-height: calc(100dvh - 24px); overflow-y: auto;
     box-shadow: 0 8px 30px rgba(0,0,0,0.12);
   }
-  .panel h1 { margin: 0; font: 600 17px/1.2 var(--font-head); text-wrap: balance; }
+  .panel h1 { margin: 0; font: 600 17px/1.2 var(--font-head); text-wrap: balance; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none; padding-right: 28px; }
+  .panel.dragging h1 { cursor: grabbing; }
   .panel p { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; }
   .eyebrow { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
   .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; background: var(--chip); padding: 4px; border-radius: 9px; }
@@ -88,6 +89,19 @@
   #knob { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: var(--accent); opacity: .85; }
   .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
   kbd { font: 600 11px var(--font-ui); background: var(--chip); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+  #measure {
+    position: absolute; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+    display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px); box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  #measure[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+  #measureHint {
+    position: absolute; z-index: 6; left: 50%; transform: translateX(-50%); bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px; font: 500 12.5px var(--font-ui); white-space: nowrap; pointer-events: none;
+  }
+  body.measuring #stage canvas { cursor: crosshair; }
+  .label.measure { background: #e4572e; color: #fff; border-color: transparent; font-size: 12.5px; }
+  .label.measure span { color: rgba(255,255,255,0.85); }
   #err { position: absolute; inset: auto 16px 16px 16px; z-index: 9; background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--line); }
   @media (max-width: 520px) { .panel { width: auto; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); } .hud { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); } }
 </style>
@@ -95,9 +109,9 @@
 
 <div id="stage"></div>
 
-<section class="panel" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 25.11.2026, 21:40</small></h1>
-  <button id="toggle" aria-label="Panel einklappen">–</button>
+<section class="panel min" id="panel">
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 26.11.2026, 12:45</small></h1>
+  <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
     <div class="seg" role="group" aria-label="Ansicht">
@@ -142,6 +156,10 @@
 </section>
 
 <div class="hud" id="hud" hidden>Außen</div>
+<button id="measure" aria-pressed="false" aria-label="Strecke messen" title="Strecke messen">
+  <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 15.5 15.5 3 21 8.5 8.5 21z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 12.5l1.6 1.6M9.5 10l2.2 2.2M12 7.5l1.6 1.6M14.5 5l2.2 2.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+</button>
+<div id="measureHint" hidden>Zwei Punkte antippen, um die Strecke zu messen</div>
 <div id="joy" hidden><div id="knob"></div></div>
 
 <script type="importmap">
@@ -413,11 +431,23 @@ const siteLabels = [];
     const eastY = SITE.own[9][1] + (SITE.own[10][1] - SITE.own[9][1]) * (400 - SITE.own[9][0]) / (SITE.own[10][0] - SITE.own[9][0]);
     const gravel = [[400, eastY], ...roadEdge, cut, [-159, 240], [-9, 240], [-9, -9], [400, -9]];
     flat(gravel, 0.007, M('#ffffff', { map: tex, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+    /* Schotter auch jenseits des Nachbarzauns (Grundstück 1004/4): ca. 4 m breit über die ganze Zaunlänge,
+       vorne bis zur Straßengrenze. */
+    {
+      const T = SITE.own[9], R0 = SITE.roadA;                 // Straßengrenze läuft vom Spitz weiter Richtung Nordwesten
+      const fy = -570, x1 = 191 + SITE_SHIFT_X, y4 = fy - 400;
+      const roadX = y => {                                   // Plan-x der Straßengrenze in Höhe y (über den Spitz hinaus)
+        const a = T, b = [-2351 + SITE_SHIFT_X, -1162 + SITE_SHIFT_Y];
+        return a[0] + (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]);
+      };
+      const yb = -536;                                       // ab unserer Grundgrenze (Grenzlinie bleibt sichtbar), also auch unter dem Zaun
+      flat([[roadX(yb), yb], [x1, yb], [x1, y4], [roadX(y4), y4]], 0.007, M('#ffffff', { map: tex, roughness: 1, polygonOffset: true, polygonOffsetFactor: -2 }));
+    }
   }
   /* Wiese westlich des schmalen Streifens: eben auf −0,30 (bündig mit dem Streifen, gleich hoch wie die
      Wiese hinter der Terrasse); zum Schotter im Norden (Flucht x −159) eine 17 cm Kante. */
   {
-    const pts = [[-159, 916], [617, 916], [617, 1116], [700, 1116], [700, 1668], [-81, 1700], [-140, 1552], [-159, 1510]];   // endet am Schwemmholzzaun; davor (Mülltonnen) Straßenniveau
+    const pts = [[-159, 916], [617, 916], [617, 1116], [700, 1116], [700, 1650], [-39, 1683], [-98, 1535], [-117, 1493], [-159, 1493]];   // endet am Schwemmholzzaun; davor (Mülltonnen) Straßenniveau
     const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(X(x), -Z(y))));
     const geo = new THREE.ExtrudeGeometry(s, { depth: STRIP - GN + 0.03, bevelEnabled: false });
     geo.rotateX(-Math.PI / 2); geo.translate(0, GN - 0.03, 0);
@@ -505,7 +535,15 @@ const siteLabels = [];
    an der Südseite (zu 998) noch ca. 8 m ums Eck, beginnt ca. 1 m vor der Straße. Stehende Bretter, wechselseitig überlappend. */
 {
   // + Zaun des Nachbarn an der Grenze zu 1004/4: 40 cm außerhalb, von der Spitze bis zur Hausvorderkante
-  const runs = [[[241, 1757], [3668, 1576]], [[3668, 1576], [3666, 1275]], [[3666, 1275], [3658, 776]], [[-1650, -491], [191, -490]]]
+  // Nachbarzaun beginnt exakt am Schnittpunkt mit unserem Schwemmholzzaun beim Spitz (Flucht 95 cm innerhalb der Straßengrenze)
+  const nbStartX = (() => {
+    const T = SITE.own[9], N = SITE.own[8], C = [508, 378];
+    const L0 = Math.hypot(N[0] - T[0], N[1] - T[1]), dx = (N[0] - T[0]) / L0, dy = (N[1] - T[1]) / L0;
+    let nx = -dy, ny = dx; if (nx * (C[0] - T[0]) + ny * (C[1] - T[1]) < 0) { nx = -nx; ny = -ny; }
+    const ox = T[0] + nx * 95, oy = T[1] + ny * 95, s0 = (-490 + SITE_SHIFT_Y - oy) / dy;
+    return ox + dx * s0 - SITE_SHIFT_X;
+  })();
+  const runs = [[[241, 1757], [3668, 1576]], [[3668, 1576], [3666, 1275]], [[3666, 1275], [3658, 776]], [[nbStartX, -490], [191, -490]]]
     .map(r => r.map(([x, y]) => [x + SITE_SHIFT_X, y + SITE_SHIFT_Y]));
   const boards = [], posts = [], rails = [], braces = [];
   const fg = (x, ours) => ours ? Math.max(gw(x), STRIP) : gw(x);   // Westzaun steht in der Wiese auf −0,30
@@ -594,7 +632,7 @@ const siteLabels = [];
 }
 
 /* Zäunchen aus stehendem Schwemmholz, ca. 1 m hoch: beginnt am ersten Steher des Lärchenzauns
-   und läuft mit ca. 50 cm Abstand zum Bankett gebogen der Straße entlang, ca. 11 m. */
+   und läuft gebogen der Straße entlang, ca. 11 m, mit 1,45 m Abstand zum Asphalt der Straße. */
 {
   const C = [508, 378];                                   // Hausmitte, zeigt ins Grundstück
   const edge = SITE.own.slice(1, 10);                     // Nordwestspitz … entlang der Straße
@@ -603,7 +641,7 @@ const siteLabels = [];
     const tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty);
     let nx = -ty / tl, ny = tx / tl;
     if (nx * (C[0] - p[0]) + ny * (C[1] - p[1]) < 0) { nx = -nx; ny = -ny; }
-    return [p[0] + nx * 50, p[1] + ny * 50];
+    return [p[0] + nx * 95, p[1] + ny * 95];                // 95 cm innerhalb der Grenze = 1,45 m bis zum Asphalt der Straße
   });
   const start = [241 + SITE_SHIFT_X, 1757 + SITE_SHIFT_Y];
   // erster Punkt der Linie, der vom Zaunsteher aus „vorwärts“ entlang der Straße liegt
@@ -656,6 +694,80 @@ const siteLabels = [];
   }
 }
 
+/* Zweiter Schwemmholzzaun vorne beim Nordost-Spitz: beginnt in der Ecke am Zaun des Nachbarn (1004/4),
+   läuft ca. 4 m entlang der Grundgrenze zur Straße (Pflastersteine), wie der andere Schwemmholzzaun
+   1,45 m vom Asphalt der Straße entfernt, knickt dann ab und läuft ca. 7 m parallel zum Nachbarzaun Richtung Haus.
+   Die Lattung sitzt an der langen Seite innen (zum Nachbarzaun hin). */
+{
+  const C = [508, 378];                                   // Hausmitte, zeigt ins Grundstück
+  const T = SITE.own[9], N = SITE.own[8];                 // Spitz und nächster Punkt der Straßengrenze
+  const L0 = Math.hypot(N[0] - T[0], N[1] - T[1]), dx = (N[0] - T[0]) / L0, dy = (N[1] - T[1]) / L0;
+  let nx = -dy, ny = dx; if (nx * (C[0] - T[0]) + ny * (C[1] - T[1]) < 0) { nx = -nx; ny = -ny; }
+  const nbY = -490 + SITE_SHIFT_Y;                        // Flucht des Nachbarzauns (Plan-y)
+  // Start: Schnitt der um 50 cm nach innen versetzten Grenzlinie mit dem Nachbarzaun
+  const ox = T[0] + nx * 95, oy = T[1] + ny * 95, s0 = (nbY - oy) / dy;   // 1,45 m bis zum Asphalt der Straße
+  const S = [ox + dx * s0, oy + dy * s0], E = [S[0] + dx * 400, S[1] + dy * 400], F = [E[0] + 700, E[1]];
+  const path = [S, E, F], pts = [];
+  for (let i = 0; i < path.length - 1; i++) {
+    const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    for (let s = 0; s < L; s += 8) pts.push([a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L, (b[0] - a[0]) / L, (b[1] - a[1]) / L]);
+  }
+  const woodCols = ['#b9b2a6', '#a39a8d', '#cdc6b9', '#958c80', '#c2b8a8', '#ada392'].map(c => new THREE.Color(c));
+  const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 7), M('#ffffff', { roughness: 0.95, flatShading: true }), pts.length);
+  const d = new THREE.Object3D();
+  let seed = 31; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  pts.forEach(([x, y, ux, uy], i) => {
+    const r = 0.025 + rnd() * 0.035, h = 0.85 + rnd() * 0.3, j = (rnd() - 0.5) * 4;
+    d.position.set(X(x - uy * j), gAt(x) + h / 2 - 0.03, Z(y + ux * j));
+    d.rotation.set((rnd() - 0.5) * 0.12, rnd() * 3, (rnd() - 0.5) * 0.12);
+    d.scale.set(r, h, r * (0.8 + rnd() * 0.3));
+    d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, woodCols[Math.floor(rnd() * woodCols.length)]);
+  });
+  im.castShadow = im.receiveShadow = true; groups.site.add(im);
+  // Trägergerüst: Steher an Anfang, Knick, Mitte und Ende, Querlatten oben und unten
+  const frameWood = M('#8f7556', { roughness: 0.85 });
+  const kink = Math.round(400 / 8);
+  const inner = pts.map(([x, y, ux, uy], k) => {
+    let qx = -uy, qy = ux;
+    if (qx * (C[0] - x) + qy * (C[1] - y) < 0) { qx = -qx; qy = -qy; }
+    if (k >= kink) { qx = -qx; qy = -qy; }                   // lange Seite: Lattung zum Nachbarzaun hin
+    return [x + qx * 9, y + qy * 9];
+  });
+  [0, kink, Math.round((kink + inner.length - 1) / 2), inner.length - 1].forEach(k => {
+    const [x, y] = inner[k];
+    box(x - 4, x + 4, y - 4, y + 4, gAt(x), gAt(x) + 1.0, frameWood, groups.site);
+  });
+  for (const hh of [0.23, 0.83]) {
+    for (let i = 0; i < inner.length - 1; i += 3) {
+      const a = inner[i], b = inner[Math.min(i + 3, inner.length - 1)];
+      const ddx = (b[0] - a[0]) / 100, ddz = (b[1] - a[1]) / 100, L = Math.hypot(ddx, ddz);
+      if (L < 0.01) continue;
+      const m = addMesh(new THREE.BoxGeometry(L + 0.02, 0.07, 0.035), frameWood, groups.site, { shadow: false });
+      m.position.set(X((a[0] + b[0]) / 2), gAt(a[0]) + hh, Z((a[1] + b[1]) / 2)); m.rotation.y = -Math.atan2(ddz, ddx);
+    }
+  }
+  for (let i = 0; i < pts.length; i += 6) {
+    const c = addMesh(new THREE.BoxGeometry(0.5, 1.0, 0.5), mat.rail, groups.site, { collide: true, shadow: false });
+    c.position.set(X(pts[i][0]), gAt(pts[i][0]) + 0.5, Z(pts[i][1])); c.scale.set(0.5, 1, 0.5); c.visible = false;
+  }
+}
+
+/* Zweite Holzbank (gleiche Bauart wie die beim Fallrohr) im neu umzäunten Bereich beim Nordost-Spitz,
+   in der Ecke ca. 2 m vom Schnittpunkt der beiden Zäune, mit der Lehne direkt am Zaun des Nachbarn,
+   Blick Richtung Haus, auf dem Schotter. */
+{
+  const bw = M('#958f85', { roughness: 0.9 });   // vergraut
+  const x0 = -1640, x1 = -1480, oy = -1347, base = GN, seat = base + 0.45;   // oy: Versatz der Plan-y gegenüber der ersten Bank
+  for (let i = 0; i < 6; i++) box(x0, x1, oy + 785 + i * 9, oy + 790 + i * 9, seat - 0.05, seat, bw, groups.site);
+  for (const x of [x0 + 8, x1 - 13]) {
+    box(x, x + 5, oy + 827, oy + 835, base, seat - 0.05, bw, groups.site);
+    box(x, x + 5, oy + 781, oy + 788, base, base + 0.80, bw, groups.site);
+    box(x, x + 5, oy + 781, oy + 835, seat - 0.12, seat - 0.05, bw, groups.site);
+  }
+  box(x0, x1, oy + 788, oy + 790.4, base + 0.61, base + 0.78, bw, groups.site);
+  box(x0, x1, oy + 781, oy + 835, base, seat, bw, groups.site, { collide: true }).visible = false;
+}
+
 /* Mülltonnen auf dem Bankett vor dem Schwemmholzzaun, rechts an der Ecke (von der Straße aus) beim
    Nordwestspitz: kleine schwarze (120 l), grüne, schwarze mit gelbem und schwarze mit rotem Deckel (je 240 l).
    Griff und Räder zum Zaun, Vorderseite zur Straße. */
@@ -677,8 +789,8 @@ const siteLabels = [];
   const blk = M('#232527', { roughness: 0.6 }), tire = M('#151617', { roughness: 0.9 }), steelB = M('#8d9399', { metalness: 0.5, roughness: 0.4 });
   const bin = (t, w, d, h, body, lid) => {
     const p = at(t), g = new THREE.Group();
-    // ganz an den Schwemmholzzaun (steht 50 cm innerhalb der Grenze): Schiebegriff berührt fast die Hölzer
-    const cx = p.x + p.nx * (d * 50 - 37), cy = p.y + p.ny * (d * 50 - 37);
+    // ganz an den Schwemmholzzaun (steht 95 cm innerhalb der Grenze): Schiebegriff berührt fast die Hölzer
+    const cx = p.x + p.nx * (d * 50 - 82), cy = p.y + p.ny * (d * 50 - 82);
     g.position.set(X(cx), GN, Z(cy));
     g.rotation.y = Math.atan2(-p.ny, p.nx);               // lokal +x = zur Straße
     const bx = (sx, sy, sz, x, y, z, m) => { const k = new THREE.Mesh(new THREE.BoxGeometry(sx, sy, sz), m); k.position.set(x, y, z); k.castShadow = k.receiveShadow = true; g.add(k); return k; };
@@ -2653,6 +2765,79 @@ const keys = new Set();
 addEventListener('keydown', e => { if (walking) { keys.add(e.code); if (e.code.startsWith('Arrow')) e.preventDefault(); } });
 addEventListener('keyup', e => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
+
+// Messwerkzeug: Knopf unten rechts, dann zwei Punkte antippen → Strecke mit Länge (dazu waagrecht und Höhenunterschied).
+// Weitere Messungen bleiben stehen, bis das Werkzeug wieder ausgeschaltet wird.
+{
+  const btn = document.getElementById('measure'), hint = document.getElementById('measureHint');
+  const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+  const items = [];                                  // alles, was zum Messen gezeichnet wurde
+  const lineM = new THREE.LineBasicMaterial({ color: '#e4572e', depthTest: false });
+  const dotM = new THREE.MeshBasicMaterial({ color: '#e4572e', depthTest: false });
+  const dotG = new THREE.SphereGeometry(0.06, 16, 12);
+  let on = false, first = null, down = null;
+  const fmt = v => v.toLocaleString('de-AT', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' m';
+  const shown = o => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  const pick = (cx, cy) => {
+    const r = renderer.domElement.getBoundingClientRect();
+    ndc.set(((cx - r.left) / r.width) * 2 - 1, -((cy - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(ndc, camera);
+    const hit = ray.intersectObjects(scene.children, true).find(h => h.object.isMesh && !h.object.isSprite && shown(h.object) && h.distance < 120 && !h.object.userData.measure);
+    return hit ? hit.point.clone() : null;
+  };
+  const dot = p => { const m = new THREE.Mesh(dotG, dotM); m.position.copy(p); m.renderOrder = 10; m.userData.measure = true; scene.add(m); items.push(m); return m; };
+  const clear = () => { items.forEach(o => { o.removeFromParent(); if (o.element) o.element.remove(); }); items.length = 0; first = null; };
+  const set = v => {
+    on = v; btn.setAttribute('aria-pressed', String(on)); hint.hidden = !on; document.body.classList.toggle('measuring', on);
+    if (!on) clear();
+  };
+  btn.addEventListener('click', () => set(!on));
+  addEventListener('keydown', e => { if (e.code === 'Escape' && on) set(false); });
+  renderer.domElement.addEventListener('pointerdown', e => { if (on) down = { x: e.clientX, y: e.clientY, t: performance.now() }; });
+  renderer.domElement.addEventListener('pointerup', e => {
+    if (!on || !down) return;
+    const moved = Math.hypot(e.clientX - down.x, e.clientY - down.y), dt = performance.now() - down.t; down = null;
+    if (moved > 6 || dt > 600) return;                // gezogen = Ansicht drehen, nicht messen
+    const p = pick(e.clientX, e.clientY); if (!p) return;
+    dot(p);
+    if (!first) { first = p; hint.textContent = 'Zweiten Punkt antippen'; return; }
+    const a = first, b = p; first = null; hint.textContent = 'Zwei Punkte antippen, um die Strecke zu messen';
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), lineM); line.renderOrder = 10; line.userData.measure = true; scene.add(line); items.push(line);
+    const len = a.distanceTo(b), flat = Math.hypot(b.x - a.x, b.z - a.z), dh = Math.abs(b.y - a.y);
+    const el = document.createElement('div'); el.className = 'label measure';
+    el.innerHTML = fmt(len) + (dh > 0.05 ? `<span>waagrecht ${fmt(flat)} · Höhe ${fmt(dh)}</span>` : '');
+    const lab = new CSS2DObject(el); lab.position.copy(a).add(b).multiplyScalar(0.5); lab.position.y += 0.15; scene.add(lab); items.push(lab);
+  });
+}
+
+// Menü per Ziehen an der Titelzeile verschieben (Maus und Finger); die Lage bleibt im Browser gemerkt
+{
+  const handle = panel.querySelector('h1');
+  let drag = null;
+  const place = (x, y) => {
+    const r = panel.getBoundingClientRect();
+    x = Math.max(4, Math.min(innerWidth - r.width - 4, x)); y = Math.max(4, Math.min(innerHeight - 40, y));
+    panel.style.left = x + 'px'; panel.style.top = y + 'px'; panel.style.right = 'auto';
+    panel.style.maxHeight = Math.max(120, innerHeight - y - 12) + 'px';   // aufgeklappt nicht über den unteren Rand
+    return [x, y];
+  };
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    const r = panel.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    panel.style.width = r.width + 'px';
+    handle.setPointerCapture(e.pointerId); panel.classList.add('dragging'); e.preventDefault();
+  });
+  handle.addEventListener('pointermove', e => { if (drag && drag.id === e.pointerId) place(e.clientX - drag.dx, e.clientY - drag.dy); });
+  const end = e => {
+    if (!drag || drag.id !== e.pointerId) return;
+    drag = null; panel.classList.remove('dragging');
+    try { localStorage.setItem('hausPanelPos', JSON.stringify([parseFloat(panel.style.left), parseFloat(panel.style.top)])); } catch (_) {}
+  };
+  handle.addEventListener('pointerup', end); handle.addEventListener('pointercancel', end);
+  try { const p = JSON.parse(localStorage.getItem('hausPanelPos') || 'null'); if (p) { panel.style.width = panel.getBoundingClientRect().width + 'px'; place(p[0], p[1]); } } catch (_) {}
+  addEventListener('resize', () => { if (panel.style.left) place(parseFloat(panel.style.left), parseFloat(panel.style.top)); });
+}
 
 // Umschauen per Ziehen
 let look = null;
