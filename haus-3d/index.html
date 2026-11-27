@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 16:45</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 17:10</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -127,6 +127,7 @@
     </div>
     <div class="jumps toggles" style="margin-top:8px">
       <button class="btn" id="tLabels" aria-pressed="false">Grundstücksbezeichnungen</button>
+      <button class="btn" id="doorView">Aus der Haustür</button>
     </div>
   </div>
   <p id="orbitHelp">Ziehen zum Drehen, Rad oder zwei Finger zum Zoomen, rechte Maustaste zum Verschieben. Maße aus dem Polierplan, Maßstab 1:50.</p>
@@ -807,10 +808,10 @@ const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
 }
 
 /* Mülltonnen auf dem Bankett vor dem Schwemmholzzaun, rechts an der Ecke (von der Straße aus) beim
-   Nordwestspitz: kleine schwarze (120 l), grüne, schwarze mit gelbem und schwarze mit rotem Deckel (je 240 l).
+   Nordwestspitz: kleine schwarze, grüne und schwarze mit rotem Deckel (je 120 l), schwarze mit gelbem Deckel (240 l).
    Griff und Räder zum Zaun, Vorderseite zur Straße. */
 {
-  const path = [SITE.own[1], SITE.own[2], SITE.own[3]];
+  const path = [SITE.own[1], SITE.own[2], SITE.own[3], SITE.own[4]];
   const at = t => {                                        // Punkt t Meter ab dem Spitz entlang der Straßengrenze
     let s = t * 100;
     for (let i = 0; i < path.length - 1; i++) {
@@ -846,10 +847,11 @@ const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
     groups.site.add(g);
     const c = addMesh(new THREE.BoxGeometry(d, h, w), mat.rail, g, { collide: true, shadow: false }); c.position.y = h / 2; c.visible = false;
   };
-  bin(0.9, 0.48, 0.55, 0.93, blk, blk);                                          // klein schwarz (Restmüll 120 l)
-  bin(1.52, 0.58, 0.73, 1.07, M('#2f7d3a', { roughness: 0.55 }), M('#2a7034', { roughness: 0.55 }));   // grün (Bio)
-  bin(2.19, 0.58, 0.73, 1.07, blk, M('#f2c318', { roughness: 0.5 }));            // gelber Deckel (Plastik/Verpackung)
-  bin(2.86, 0.58, 0.73, 1.07, blk, M('#c8231d', { roughness: 0.5 }));            // roter Deckel (Altpapier)
+  // nur die Tonne mit gelbem Deckel ist groß (240 l), alle anderen klein (120 l); ca. 1 m weiter östlich als früher
+  bin(1.9, 0.48, 0.55, 0.93, blk, blk);                                          // klein schwarz (Restmüll)
+  bin(2.46, 0.48, 0.55, 0.93, M('#2f7d3a', { roughness: 0.55 }), M('#2a7034', { roughness: 0.55 }));   // grün (Bio)
+  bin(3.07, 0.58, 0.73, 1.07, blk, M('#f2c318', { roughness: 0.5 }));            // gelber Deckel (Plastik/Verpackung), groß
+  bin(3.68, 0.48, 0.55, 0.93, blk, M('#c8231d', { roughness: 0.5 }));            // roter Deckel (Altpapier)
 }
 
 /* Luft-Wärmepumpe (Außeneinheit, ca. 110 × 77 × 45 cm) an der Hausecke westlich der Haustür,
@@ -2626,49 +2628,89 @@ const carport = { variants: [null], cars: null, roofs: [] };
   carport.anth = anth;
 }
 
-/* Autos (vereinfachte Modelle in Originalmaßen): Skoda Octavia Combi grau, Peugeot 208 lila. */
+/* Autos (vereinfachte Modelle in Originalmaßen): Skoda Octavia Combi silber, Peugeot 208 lila. */
 function makeCar({ L, W, H, wb, fo, color, kombi, plate, grille }) {
+  /* Karosserie als glatte, gerundete Flächen: Querschnitte (Superellipsen) entlang der Länge, Seitenlinie
+     über Splines; Glashaus darauf, Dach und Säulen in Wagenfarbe, Räder mit gerundeten Reifen. */
   const g = new THREE.Group(); g.userData.toggle = true;
-  const paint = M(color, { roughness: 0.32, metalness: 0.5 });
-  const glass = M('#1b232b', { roughness: 0.12, metalness: 0.7 });
-  const black = M('#151618', { roughness: 0.7 });
+  const paint = M(color, { roughness: 0.28, metalness: 0.55 });
+  const glass = M('#1b232b', { roughness: 0.08, metalness: 0.75 });
+  const black = M('#151618', { roughness: 0.75 });
   const chrome = M('#c9ced3', { roughness: 0.25, metalness: 0.9 });
-  const xf = L / 2, xr = -L / 2, hood = kombi ? 1.12 : 1.0;
-  const ext = (pts, w, m, bevel = 0.035) => {
-    const s = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
-    const geo = new THREE.ExtrudeGeometry(s, { depth: w - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 2 });
-    geo.translate(0, 0, -(w - 2 * bevel) / 2);
-    const mesh = new THREE.Mesh(geo, m); mesh.castShadow = true; mesh.receiveShadow = true; g.add(mesh); return mesh;
+  const xf = L / 2, xr = -L / 2, hood = kombi ? 1.12 : 1.0, hw = W / 2 - 0.035;
+  const add = (geo, m) => { const k = new THREE.Mesh(geo, m); k.castShadow = true; k.receiveShadow = true; g.add(k); return k; };
+  // Höhenlinie aus Stützpunkten (x aufsteigend) → y(x)
+  const line = pts => {
+    const c = new THREE.SplineCurve(pts.map(([x, y]) => new THREE.Vector2(x, y))), ps = c.getPoints(240);
+    return x => { for (let i = 1; i < ps.length; i++) if (ps[i].x >= x) { const a = ps[i - 1], b = ps[i], t = (x - a.x) / ((b.x - a.x) || 1); return a.y + (b.y - a.y) * t; } return ps[ps.length - 1].y; };
   };
-  const bx = (x0, x1, y0, y1, w, m, z = 0) => { const k = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(x1 - x0), y1 - y0, w), m); k.position.set((x0 + x1) / 2, (y0 + y1) / 2, z); k.castShadow = true; g.add(k); return k; };
-  // Karosserie bis zur Gürtellinie
-  ext([[xr + 0.06, 0.24], [xf - 0.14, 0.24], [xf - 0.04, 0.4], [xf - 0.03, 0.62], [xf - 0.32, 0.78], [xf - hood, 0.93], [xr + 0.08, kombi ? 0.98 : 0.99], [xr + 0.04, 0.62]], W, paint);
-  // Fensterband (dunkles Glas)
-  const gTop = H - 0.07, rear = kombi ? 0.16 : 0.46;
-  ext([[xf - hood + 0.02, 0.9], [xf - hood - 0.72, gTop], [xr + rear, gTop - 0.01], [xr + (kombi ? 0.07 : 0.16), 0.95]], W - 0.2, glass, 0.025);
-  // Dach und Säulen in Wagenfarbe
-  bx(xf - hood - 0.78, xr + rear + 0.04, gTop - 0.02, H, W - 0.24, paint);
-  const pillar = (x, w) => bx(x - w / 2, x + w / 2, 0.95, gTop, W - 0.16, paint);
-  pillar((xf - hood - 0.7 + xr + rear) / 2 + (kombi ? 0.25 : 0.15), 0.1);       // B-Säule
-  if (kombi) pillar(xr + 0.62, 0.12);                                           // C-Säule (Kombi hat ein drittes Seitenfenster)
-  else pillar(xr + rear + 0.2, 0.38);
-  if (kombi) [-1, 1].forEach(sz => bx(xf - hood - 0.6, xr + 0.25, H, H + 0.04, 0.035, chrome, sz * (W / 2 - 0.2)));   // Dachreling
-  // Räder
+  // Loft: prof(x) → {yb, yt, wb, wt, n}; Enden mit Radius rr (hinten) / rf (vorne) kugelig geschlossen
+  const loft = (x0, x1, prof, rr, rf, m, nX = 48, nA = 32, grow = 0) => {
+    const pos = [], idx = [];
+    for (let i = 0; i <= nX; i++) {
+      const x = x0 + (x1 - x0) * (0.5 - 0.5 * Math.cos(Math.PI * i / nX));
+      const e = Math.max(0, Math.min(1, rr ? (x - x0) / rr : 1, rf ? (x1 - x) / rf : 1)), k = Math.sqrt(1 - (1 - e) * (1 - e));
+      const { yb, yt, wb, wt, n } = prof(x), yc = (yb + yt) / 2, hh = (yt - yb) / 2 * k + grow;
+      for (let j = 0; j < nA; j++) {
+        const th = 2 * Math.PI * j / nA, c = Math.cos(th), sn = Math.sin(th);
+        const u = Math.sign(c) * Math.pow(Math.abs(c), 2 / n), v = Math.sign(sn) * Math.pow(Math.abs(sn), 2 / n);
+        const w = (wb + (wt - wb) * (v + 1) / 2) * k + grow;
+        pos.push(x, yc + v * hh, u * w);
+      }
+    }
+    for (let i = 0; i < nX; i++) for (let j = 0; j < nA; j++) {
+      const a = i * nA + j, b = i * nA + (j + 1) % nA, c = a + nA, d = b + nA;
+      idx.push(a, c, b, b, c, d);
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+    return add(geo, m);
+  };
+  const xW = xf - hood;                                               // Fuß der Windschutzscheibe
+  const belt = line([[xr, 0.84], [xr + 0.35, 0.96], [xW - 0.3, 0.95], [xW, 0.93], [xf - 0.45, 0.82], [xf - 0.12, 0.72], [xf, 0.62]]);
+  const sill = x => 0.22 + 0.06 * Math.max(0, (x - (xf - 0.5)) / 0.5) + 0.05 * Math.max(0, ((xr + 0.4) - x) / 0.4);
+  loft(xr, xf, x => ({ yb: sill(x), yt: belt(x), wb: hw - 0.02, wt: hw - 0.05, n: 5 }), 0.28, 0.42, paint);
+  // Glashaus
+  const rearX = xr + (kombi ? 0.12 : 0.22), roofEnd = xr + (kombi ? 0.62 : 0.7);   // Octavia Combi: Heckklappe schräg
+  const roof = line([[rearX, kombi ? belt(rearX) + 0.1 : 1.0], ...(kombi ? [[xr + 0.36, H - 0.13]] : []), [roofEnd, H - 0.02], [(roofEnd + xW - 0.8) / 2, H], [xW - 0.8, H - 0.02], [xW - 0.4, (H + belt(xW)) / 2 + 0.03], [xW + 0.02, belt(xW) + 0.01]]);
+  const gh = x => ({ yb: belt(x) - 0.04, yt: Math.max(belt(x) - 0.02, roof(x)), wb: hw - 0.05, wt: hw - 0.23, n: 3.2 });
+  loft(rearX, xW + 0.02, gh, 0.06, 0.04, glass, 48, 32);
+  // Dach in Wagenfarbe: oberster Streifen des Glashauses, minimal größer
+  loft(roofEnd - (kombi ? 0.18 : 0.3), xW - 0.75, x => { const p = gh(x), f = 0.07 / Math.max(0.1, p.yt - p.yb); return { ...p, yb: p.yt - 0.07, wb: p.wt + (p.wb - p.wt) * f * 0.5 }; }, 0.05, 0.05, paint, 24, 32, 0.006);
+  // Säulen (B, C bzw. breite C-Säule beim Fünftürer)
+  const pil = (a, b) => loft(a, b, x => { const p = gh(x); return { ...p, yb: belt(x) - 0.01 }; }, 0, 0, paint, 4, 32, 0.005);
+  const xB = (xW - 0.75 + roofEnd) / 2 + (kombi ? 0.22 : 0.12);
+  pil(xB - 0.05, xB + 0.05);
+  if (kombi) pil(xr + 0.66, xr + 0.76); else pil(xr + 0.42, xr + 0.85);
+  if (kombi) [-1, 1].forEach(sz => {                                  // Dachreling
+    const r = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, xW - 0.65 - (xr + 0.55), 8), chrome);
+    r.rotation.z = Math.PI / 2; r.position.set((xW - 0.65 + xr + 0.55) / 2, H + 0.03, sz * (hw - 0.26)); g.add(r);
+  });
+  // Räder: dunkler Radlauf auf der Flanke, gerundeter Reifen, Felge mit Speichen
+  const tireGeo = new THREE.LatheGeometry([[0.2, -0.1], [0.27, -0.105], [0.305, -0.09], [0.318, -0.05], [0.318, 0.05], [0.305, 0.09], [0.27, 0.105], [0.2, 0.1]].map(([r, y]) => new THREE.Vector2(r, y)), 32);
+  const rimM = M('#b9bec4', { roughness: 0.3, metalness: 0.85 }), archM = M('#0d0e0f', { roughness: 0.9 });
   const fa = xf - fo, ra = fa - wb;
   [fa, ra].forEach(x => [-1, 1].forEach(sz => {
-    const w = new THREE.Mesh(new THREE.CylinderGeometry(0.315, 0.315, 0.21, 22), black); w.rotation.x = Math.PI / 2; w.position.set(x, 0.315, sz * (W / 2 - 0.12)); w.castShadow = true; g.add(w);
-    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.02, 18), chrome); hub.rotation.x = Math.PI / 2; hub.position.set(x, 0.315, sz * (W / 2 - 0.005)); g.add(hub);
-    bx(x - 0.42, x + 0.42, 0.24, 0.27, 0.06, black, sz * (W / 2 - 0.01));       // Radlauf-Schutz
+    const arch = new THREE.Mesh(new THREE.CircleGeometry(0.37, 32, 0, Math.PI), archM);
+    arch.position.set(x, 0.315, sz * (hw - 0.005)); if (sz < 0) arch.rotation.y = Math.PI; g.add(arch);
+    const zc = sz * (W / 2 - 0.105);
+    const t = add(tireGeo, black); t.rotation.x = Math.PI / 2; t.position.set(x, 0.315, zc);
+    const rim = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.012, 28), rimM); rim.rotation.x = Math.PI / 2; rim.position.set(x, 0.315, sz * (W / 2 - 0.012)); g.add(rim);
+    for (let k = 0; k < 5; k++) {
+      const sp = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.17, 0.008), black); const a = k * Math.PI * 2 / 5;
+      sp.position.set(x + Math.sin(a) * 0.1, 0.315 + Math.cos(a) * 0.1, sz * (W / 2 - 0.004)); sp.rotation.z = -a; g.add(sp);
+    }
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.02, 16), chrome); hub.rotation.x = Math.PI / 2; hub.position.set(x, 0.315, sz * (W / 2 - 0.004)); g.add(hub);
   }));
-  // Licht, Kühlergrill, Kennzeichen, Spiegel
-  const lamp = M('#f4f6f8', { emissive: '#d8e4ee', emissiveIntensity: 0.25, roughness: 0.2 }), tail = M('#b3121b', { emissive: '#5a0006', emissiveIntensity: 0.4, roughness: 0.3 });
+  // Licht, Kühlergrill, Spiegel
+  const lamp = M('#d9dee3', { emissive: '#c8d4de', emissiveIntensity: 0.12, roughness: 0.1, metalness: 0.3 }), tail = M('#b3121b', { emissive: '#5a0006', emissiveIntensity: 0.4, roughness: 0.25 });
+  const blob = (sx, sy, sz, x, y, z, m) => { const k = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 12), m); k.scale.set(sx, sy, sz); k.position.set(x, y, z); g.add(k); return k; };
   [-1, 1].forEach(sz => {
-    bx(xf - 0.12, xf + 0.01, 0.62, 0.71, 0.34, lamp, sz * (W / 2 - 0.27));
-    bx(xr - 0.01, xr + 0.08, kombi ? 0.78 : 0.82, kombi ? 0.9 : 0.94, 0.3, tail, sz * (W / 2 - 0.22));
-    bx(xf - hood - 0.05, xf - hood + 0.12, 0.98, 1.08, 0.18, paint, sz * (W / 2 + 0.06));
+    blob(0.05, 0.03, 0.15, xf - 0.17, 0.685, sz * (hw - 0.24), lamp);
+    blob(0.035, 0.04, 0.14, xr + 0.1, kombi ? 0.8 : 0.84, sz * (hw - 0.17), tail);
+    blob(0.045, 0.04, 0.07, xW - 0.08, belt(xW) + 0.05, sz * (hw - 0.05), paint);
   });
-  bx(xf - 0.05, xf + 0.02, 0.42, 0.6, grille === 'wide' ? 1.1 : 0.62, black);
-  if (grille !== 'wide') bx(xf - 0.03, xf + 0.025, 0.42, 0.6, 0.66, chrome).scale.set(1, 1, 1.0);
+  blob(0.04, 0.07, grille === 'wide' ? 0.5 : 0.33, xf - 0.035, 0.46, 0, black);
+  if (grille !== 'wide') blob(0.03, 0.006, 0.3, xf - 0.04, 0.53, 0, chrome);
   const plateTex = (() => {
     const c = document.createElement('canvas'); c.width = 256; c.height = 56; const k = c.getContext('2d');
     k.fillStyle = '#ffffff'; k.fillRect(0, 0, 256, 56); k.fillStyle = '#c8102e'; k.fillRect(0, 0, 256, 7); k.fillRect(0, 49, 256, 7);
@@ -2676,8 +2718,8 @@ function makeCar({ L, W, H, wb, fo, color, kombi, plate, grille }) {
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
   })();
   const plateM = M('#ffffff', { map: plateTex, roughness: 0.4 });
-  const pf = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pf.position.set(xf + 0.03, 0.36, 0); pf.rotation.y = Math.PI / 2; g.add(pf);
-  const pr = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pr.position.set(xr - 0.02, 0.5, 0); pr.rotation.y = -Math.PI / 2; g.add(pr);
+  const pf = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pf.position.set(xf + 0.005, 0.38, 0); pf.rotation.y = Math.PI / 2; g.add(pf);
+  const pr = new THREE.Mesh(new THREE.PlaneGeometry(0.52, 0.12), plateM); pr.position.set(xr + 0.0, 0.52, 0); pr.rotation.y = -Math.PI / 2; g.add(pr);
   // Kollision: kleine Kästchen über die Grundfläche
   for (let x = xr + 0.2; x < xf; x += 0.45) for (let z = -W / 2 + 0.2; z < W / 2; z += 0.45) {
     const c = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.1, 0.42), mat.rail); c.position.set(x, 0.75, z); c.visible = false; g.add(c); colliders.push(c);
@@ -2687,7 +2729,7 @@ function makeCar({ L, W, H, wb, fo, color, kombi, plate, grille }) {
 {
   const cars = new THREE.Group(); cars.userData.toggle = true; cars.visible = false; groups.site.add(cars);
   carport.cars = cars;
-  carport.oct = makeCar({ L: 4.69, W: 1.83, H: 1.47, wb: 2.69, fo: 0.92, color: '#8e959b', kombi: true, plate: 'GM 471 OC' });
+  carport.oct = makeCar({ L: 4.69, W: 1.83, H: 1.47, wb: 2.69, fo: 0.92, color: '#c2c7cc', kombi: true, plate: 'GM 471 OC' });
   carport.p208 = makeCar({ L: 4.06, W: 1.75, H: 1.43, wb: 2.54, fo: 0.83, color: '#6d3f8c', kombi: false, plate: 'GM 208 LI', grille: 'wide' });
   carport.oct.userData.toggle = carport.p208.userData.toggle = false;
   cars.add(carport.oct, carport.p208);
@@ -2808,6 +2850,7 @@ const spots = {
   balkon: { x: 800, y: -150, feet: 2.96, yaw: 0 },
   terrasse: { x: 1150, y: 560, feet: 0, yaw: Math.PI / 2 },
   carport: { x: -1150, y: 150, feet: GN, yaw: -1.8 },
+  haustuer: { x: -45, y: 313, feet: -0.02, yaw: Math.PI / 2 },   // eben aus der Haustür getreten, Blick zur Straße
 };
 function jump(key) {
   const s = spots[key];
@@ -3034,7 +3077,14 @@ function resize() {
 }
 addEventListener('resize', resize); resize();
 // Startansicht; auf schmalen (Hochformat-)Bildschirmen weiter weg, damit Haus und Carport ganz zu sehen sind
+// Blick wie ein Mensch, der gerade aus der Haustür tritt: Augenhöhe ca. 1,65 m, Blick zur Straße
+document.getElementById('doorView').addEventListener('click', () => {
+  if (walking) { jump('haustuer'); return; }
+  camera.fov = 65; camera.updateProjectionMatrix();             // natürlicher Blickwinkel wie mit eigenen Augen
+  camera.position.set(X(-38), 1.63, Z(313)); controls.target.set(X(-138), 1.45, Z(313)); controls.update();
+});
 function homeView() {
+  camera.fov = 42; camera.updateProjectionMatrix();
   camera.position.set(-23.49, 23, 22.66); controls.target.set(-4.59, 0, 3.22);
   if (camera.aspect < 1.4) camera.position.sub(controls.target).multiplyScalar(Math.min(1.9, 1.35 / camera.aspect)).add(controls.target);
 }
