@@ -60,7 +60,7 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
   .jumps .btn { background: var(--chip); padding: 8px 10px; font-size: 12.5px; }
-  .seg.seg4 { grid-template-columns: repeat(5, 1fr); }
+  .seg.seg4 { grid-template-columns: repeat(4, 1fr); }
   .toggles .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
   #cpInfo b { color: var(--fg); font-weight: 600; }
   .collapse { justify-self: end; margin-top: -6px; }
@@ -110,7 +110,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 26.11.2026, 12:45</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 11:45</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -131,7 +131,6 @@
       <button data-cp="1" aria-pressed="false">Var. 1</button>
       <button data-cp="2" aria-pressed="false">Var. 2</button>
       <button data-cp="3" aria-pressed="false">Var. 3</button>
-      <button data-cp="4" aria-pressed="false">Var. 4</button>
     </div>
     <p id="cpInfo" style="margin-top:8px"></p>
     <div class="jumps toggles" style="margin-top:8px">
@@ -564,7 +563,7 @@ const siteLabels = [];
       if (ours) {
         const [px, pz] = at(ss, 0);
         const sgn = (nx * (inside[0] - px) + nz * (inside[1] - pz)) > 0 ? 1 : -1;
-        westPosts.push({ px, pz, ix: nx * sgn, iz: nz * sgn, gs: westLen + ss, corner: ri === 0 && ss > L - 0.01 });
+        westPosts.push({ px, pz, ix: nx * sgn, iz: nz * sgn, gs: westLen + ss, corner: ri === 1 && ss === 0 });
       }
       pi++;
     }
@@ -581,14 +580,15 @@ const siteLabels = [];
     }
     if (ours) westLen += L;
   });
-  // Schrägstützen am Westzaun: an jedem 2. Steher und an beiden Enden, aber nicht an der Innenecke
+  /* Schrägstützen am Westzaun: lange Seite an jedem 2. Steher und am Anfang, nicht an der Innenecke;
+     kurze Seite (ums Eck) nur 2 Stützen, ca. 3 m und 7 m nach der Ecke – der letzte Meter bleibt frei. */
   {
     const wp = westPosts.sort((p, q) => p.gs - q.gs).filter((p, i, arr) => i === 0 || p.gs - arr[i - 1].gs > 0.05);
-    const cornerGs = (westPosts.find(p => p.corner) || {}).gs;
+    const cornerGs = westPosts.find(p => p.corner).gs;
+    const shortPick = [3, 7].map(d => wp.filter(p => p.gs > cornerGs).reduce((b, p) => Math.abs(p.gs - cornerGs - d) < Math.abs(b.gs - cornerGs - d) ? p : b));
     wp.forEach((p, i) => {
-      const end = i === 0 || i === wp.length - 1;
-      if (!(end || i % 2 === 1)) return;
-      if (cornerGs !== undefined && Math.abs(p.gs - cornerGs) < 2.1) return;
+      if (p.gs > cornerGs + 0.05) { if (!shortPick.includes(p)) return; }
+      else if (!(i === 0 || i % 2 === 1) || Math.abs(p.gs - cornerGs) < 2.1) return;
       braces.push({ top: [p.px + p.ix * 0.05, fg(p.px, true) + 1.2, p.pz + p.iz * 0.05], foot: [p.px + p.ix * 0.6, fg(p.px + p.ix * 0.6, true), p.pz + p.iz * 0.6] });
     });
   }
@@ -1503,7 +1503,7 @@ function tiltPanel(x0, x1, y0, y1, dir, top, thick, material, shadow = true) {
     [-1, 1].forEach(sd2 => {
       const T = new THREE.Vector3(0, yT, 0), F = new THREE.Vector3(sd2 * yT, 0, 0);
       [-1, 1].forEach(e => beam(F, T, 0.045, 0.12, ladderM, zc + e * LW / 2));
-      for (let h = 0.25; h < yT - 0.15; h += 0.25) {                  // Trittstufen (wie bei einer Treppe flach)
+      for (let h = 0.25; h < yT - 0.4; h += 0.25) {                   // Trittstufen (wie bei einer Treppe flach), oberste weggelassen
         const st = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, LW), ladderM);
         st.position.set(sd2 * (yT - h), h, zc); st.castShadow = true; g.add(st);
       }
@@ -1897,7 +1897,7 @@ for (const [band, h0, h1] of [['eg', 0, 2.62], ['og', 2.96, 5.49]]) {
 
 /* ---------- Dach: Satteldach 22°, First +7,86, Traufe Ü 90 cm, Ortgang Ü 80 cm ---------- */
 const pitch = THREE.MathUtils.degToRad(22), tanP = Math.tan(pitch);
-const ridge = 7.86, thick = 0.3 / Math.cos(pitch);
+const ridge = 7.86, thick = 0.07 / Math.cos(pitch);              // Ziegeldeckung samt Lattung: am Rand nur wenige cm sichtbar (wie am Foto)
 const halfOut = 3.875 + 0.9;
 function profileShape(pts) { const s = new THREE.Shape(); pts.forEach(([u, v], i) => i ? s.lineTo(u, v) : s.moveTo(u, v)); s.closePath(); return s; }
 function extrudeAlongX(shape, x0, depth, materials, group) {
@@ -1927,6 +1927,47 @@ function extrudeAlongX(shape, x0, depth, materials, group) {
       const m = addMesh(new THREE.BoxGeometry(11.95, 0.012, L), soffit, groups.roof, { shadow: false });
       m.position.set(X(-89) + 11.95 / 2, (ridge - thick + yTop(halfOut) - thick) / 2 - 0.008, s * halfOut / 2);
       m.rotation.x = s * pitch;
+    }
+  }
+  /* Holz unter der Deckung wie am Haus: helle Fichte, Windbrett am Ortgang, Pfettenköpfe unter dem Giebelvorsprung,
+     sichtbare Sparren im Traufvorsprung; zwischen Mauerkrone und Schalung verputzt bis unter das Dach. */
+  {
+    const spruceL = M('#d6b07a', { roughness: 0.85 }), x0 = X(-89), x1 = x0 + 11.95, under = u => yTop(u) - thick - 0.012;
+    const L = halfOut / Math.cos(pitch);
+    for (const xe of [x0, x1]) for (const s of [1, -1]) {         // Windbretter an beiden Giebeln, je Dachseite
+      const b = addMesh(new THREE.BoxGeometry(0.03, 0.16, L), spruceL, groups.roof);
+      b.position.set(xe + (xe === x0 ? 0.015 : -0.015), (under(0) + under(halfOut)) / 2 - 0.08, s * halfOut / 2);
+      b.rotation.x = s * pitch;
+    }
+    // Pfettenköpfe unter dem Giebelvorsprung: Firstpfette mittig, links und rechts je eine Pfette nahe der Hausecke
+    for (const [xs, xe] of [[x0 + 0.05, X(-9)], [X(1026), x1 - 0.05]]) for (const u of [0, -3.1, 3.1]) {
+      const h = u ? 0.22 : 0.26, p = addMesh(new THREE.BoxGeometry(Math.abs(xe - xs) + 0.3, h, u ? 0.14 : 0.16), spruceL, groups.roof);
+      p.position.set((xs + xe) / 2 + (xs === x0 + 0.05 ? 0.15 : -0.15), under(u) - h / 2, u);
+    }
+    /* Zwei kleine dreieckige Spitzfenster im Giebel zur Straße, links und rechts unter der Firstpfette,
+       die schräge Seite parallel zum Dach. */
+    {
+      const reveal = M('#f2efe6', { roughness: 0.8 }), glassD = M('#3a4652', { roughness: 0.15, metalness: 0.3 });
+      const yT = under(0) - 0.26 - 0.18, w = 0.6, hgt = w * tanP;
+      [-1, 1].forEach(sd => {
+        const tri = (pad, z, m) => {
+          const a = 0.12 - pad, b = 0.12 + w + pad, sh = new THREE.Shape([new THREE.Vector2(sd * a, yT + pad), new THREE.Vector2(sd * a, yT - hgt - pad * 1.6), new THREE.Vector2(sd * b, yT - hgt - pad * 1.6)]);
+          const k = addMesh(new THREE.ExtrudeGeometry(sh, { depth: 0.02, bevelEnabled: false }), m, groups.roof, { shadow: false });
+          k.rotation.y = -Math.PI / 2; k.position.x = X(-9) - z;    // Shape-x → Welt-z (Plan-y), außen vor der Giebelwand
+          return k;
+        };
+        tri(0.05, 0.005, reveal); tri(0, 0.02, glassD);
+      });
+    }
+    const sl = (halfOut - 3.775) / Math.cos(pitch);               // Sparren im Traufvorsprung, ca. alle 80 cm
+    for (let x = x0 + 0.06; x < x1 - 0.05; x += 0.8) for (const s of [1, -1]) {
+      const r = addMesh(new THREE.BoxGeometry(0.1, 0.2, sl), spruceL, groups.roof);
+      const um = (3.775 + halfOut) / 2;
+      r.position.set(x, under(um) - 0.1 / Math.cos(pitch), s * um); r.rotation.x = s * pitch;
+    }
+    for (const s of [1, -1]) {                                    // Putz zwischen Mauerkrone und Dachschalung
+      const h0 = EAVE, h1 = under(3.875);
+      if (h1 > h0) { const f = addMesh(new THREE.BoxGeometry(X(1026) - X(-9), h1 - h0, 0.38), mat.facade, groups.roof); f.position.set((X(1026) + X(-9)) / 2, (h0 + h1) / 2, s * (3.875 - 0.19)); }
     }
   }
   // Giebelwände
@@ -2446,40 +2487,6 @@ const carport = { variants: [null], cars: null, roofs: [] };
     V.userData.carSpots = [[F, 1.45, 3.95, 'oct'], [F, 4.35, 3.8, 'p208']];
     carport.variants.push(V);
   }
-  /* ===== Variante 4: kompaktes Carport an der Straße + Werkstatt am Platz des Unterstands =====
-     Carport 6 × 6 m parallel zur Straße (1 m Abstand), geschlossene Westwand, überdachter Weg zur Haustür.
-     Statt des Fahrradunterstands eine Werkstatt 3,7 × 4,1 m vor dem Container (Plan x 20–390, y −450…−40). */
-  const s4 = 1250;
-  {
-    const V = makeGroup(), F = frame(R0[0] + u[0] * s4, R0[1] + u[1] * s4, u[0], u[1], V);
-    const fl = GN + 0.03, H = 2.30;
-    F.slab([[0, 1.0], [6.0, 1.0], [6.0, 7.0], [0, 7.0]], GN, fl, conc, { walk: true, shadow: false });
-    roofSlab(F, [[-0.3, 0.75], [6.25, 0.75], [6.25, 7.3], [-0.3, 7.3]]);
-    F.post(0.12, 1.12, H); F.post(0.12, 6.88, H); F.post(3.0, 6.88, H);
-    F.lb(-0.3, 6.0, 1.06, 1.18, 2.08, H, anth); F.lb(-0.3, 6.0, 6.82, 6.94, 2.08, H, anth);
-    F.wallL('b', 1.0, 7.0, 6.0, 0.1, fl, H);                                 // geschlossene Westwand
-    walkway(V, F, 6.25, 3.5, 7.25);
-    hailApron(F, -0.3, 6.0, 0.78, 2.30);
-    V.userData.carSpots = [[F, 1.5, 3.95, 'oct'], [F, 4.5, 3.8, 'p208']];
-    V.userData.noShelter = true;
-    // Werkstatt: a entlang Plan +y ab y −450, b entlang Plan +x ab x 20
-    /* Werkstatt liegt 0,8 m von der Grenze zu 1004/4 → nur zulässig nach Oö. BauTG § 41 Abs. 1 Z 5:
-       keine Öffnungen zur Grenze, Tür/Fenster in der Nordwand ≥ 1 m von der Grenze, Traufe ≤ 3 m über dem Fußboden
-       (hier ca. 2,8 m), Länge aller Bauten im Abstand zu 1004/4 ≤ 15 m (Container 6,3 m + Werkstatt 4,1 m). */
-    const W = frame(20, -450, 0, 1, V), WH = 2.15;
-    W.slab([[0, 0], [4.1, 0], [4.1, 3.7], [0, 3.7]], GN, fl, M('#9c7d58', { roughness: 0.9 }), { walk: true, shadow: false });
-    W.wallL('a', 0, 4.1, 0.05, 0.1, fl, WH, [{ f: 1.4, t: 2.4, s: fl, e: fl + 2.05 }, { f: 2.8, t: 3.8, s: fl + 1.0, e: fl + 1.9 }]);   // Nordseite: Tür + Fenster
-    W.wallL('b', 0, 3.7, 0.05, 0.1, fl, WH);                                 // Ostseite (Nachbar)
-    W.wallL('a', 0, 4.1, 3.65, 0.1, fl, WH);                                 // zum Container
-    W.wallL('b', 0, 3.7, 4.05, 0.1, fl, WH);                                 // zum Haus
-    const rp = [[-0.25, -0.3], [4.38, -0.3], [4.38, 3.75], [-0.25, 3.75]];
-    W.slab(rp, WH + 0.02, WH + 0.2, anth, { roof: true }); W.slab(rp, WH, WH + 0.02, soffit, { roof: true });
-    workbench(W, 0.3, 2.2, 3.6, -1);
-    [0.3, 0.62, 0.94, 1.26].forEach((a, i) => W.put(makeBike(bikeCols[i]), a, 1.3, fl + 0.01, Math.PI / 2));
-    W.put(makeMower(), 3.55, 1.0, fl, Math.PI / 2);
-    shelf(W, 3.5, 3.95, 1.75, 2.9);
-    carport.variants.push(V);
-  }
   // Ohne Carport (Ist): Autos auf dem Schotter vor dem Haus, gleich wie bei Variante 1
   {
     const g = new THREE.Group(); groups.site.add(g);
@@ -2565,7 +2572,7 @@ function placeCars(v) {
 function setCarport(v) {
   carport.current = v;
   carport.variants.forEach((V, i) => { if (i && V) V.visible = i === v; });
-  // Variante 4 steht am Platz des Fahrradunterstands: diesen dabei ausblenden, danach wie vorher
+  // eine Variante mit noShelter blendet den Fahrradunterstand aus, danach wie vorher
   if (carport.variants[v].userData.noShelter) { if (carport.shelterBefore === undefined) carport.shelterBefore = shelterG.visible; shelterG.visible = false; }
   else if (carport.shelterBefore !== undefined) { shelterG.visible = carport.shelterBefore; carport.shelterBefore = undefined; }
   placeCars(v);
@@ -2716,7 +2723,6 @@ const cpTexts = [
   '<b>Anbau am Haus:</b> Flachdach in der Hausflucht, 9,2 × 6 m, reicht direkt über die Haustür – trocken vom Auto ins Haus. Abstellraum 3,2 × 2 m im Westen (2 Räder, Mäher, Werkbank). Betonweg an der Wärmepumpe vorbei in den Garten bleibt frei und ist bis zur Hausecke überdacht. Einfahrt schräg zur Straße: 1 m (Westecke) bis 6,7 m (Osten) → mehr Schnee räumen.',
   '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
   '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
-  '<b>Carport + Werkstatt am Unterstand-Platz:</b> Carport nur 6 × 6 m, 1 m hinter der Grundgrenze, geschlossene Westwand, überdachter Gang zur Haustür. Statt des Fahrradunterstands eine Werkstatt 3,7 × 4,1 m vor dem Container: Werkbank, 4 Räder, Mäher, Regal. Der Weg Carport → Werkstatt (ca. 4 m) ist nicht überdacht. Die Werkstatt steht 0,8 m von der Grenze zu 1004/4 – geht nur als Ausnahme (keine Öffnung zur Grenze, Traufe unter 3 m).',
 ];
 const cpBtns = document.querySelectorAll('[data-cp]');
 function showCarport(v) {
@@ -2746,7 +2752,7 @@ document.getElementById('tLabels').addEventListener('click', e => {
   e.currentTarget.setAttribute('aria-pressed', String(showSiteLabels));
   if (!walking) siteLabels.forEach(l => l.visible = showSiteLabels);
 });
-showCarport(1);                                    // Startansicht: Variante 1 mit Autos und Fahrradunterstand
+showCarport(3);                                    // Startansicht: Variante 3 mit Autos und Fahrradunterstand
 carport.cars.visible = true; document.getElementById('tCars').setAttribute('aria-pressed', 'true');
 document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jump(b.dataset.jump)));
 document.getElementById('toggle').addEventListener('click', e => {
