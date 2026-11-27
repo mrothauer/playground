@@ -60,7 +60,7 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
   .jumps .btn { background: var(--chip); padding: 8px 10px; font-size: 12.5px; }
-  .seg.seg4 { grid-template-columns: repeat(4, 1fr); }
+  .seg.seg4 { grid-template-columns: repeat(5, 1fr); }
   .toggles .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
   #cpInfo b { color: var(--fg); font-weight: 600; }
   .collapse { justify-self: end; margin-top: -6px; }
@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 13:20</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 16:40</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -137,6 +137,7 @@
       <button data-cp="1" aria-pressed="false">Var. 1</button>
       <button data-cp="2" aria-pressed="false">Var. 2</button>
       <button data-cp="3" aria-pressed="false">Var. 3</button>
+      <button data-cp="4" aria-pressed="false">Var. 4</button>
     </div>
     <p id="cpInfo" style="margin-top:8px"></p>
     <div class="jumps toggles" style="margin-top:8px">
@@ -396,6 +397,7 @@ const SITE = {"own":[[3699,1604],[143,1792],[84,1649],[18,1511],[-58,1379],[-141
    Westen (Plan +y). Das Modell bleibt im Haus-Koordinatensystem, deshalb wird stattdessen das
    Grundstück in die Gegenrichtung verschoben. */
 const SITE_SHIFT_X = -270, SITE_SHIFT_Y = -80;
+const entry = {};                                    // Eingangsstiege und Katze darauf (Var. 4 ersetzt die Stiege)
 {
   const sh = p => [p[0] + SITE_SHIFT_X, p[1] + SITE_SHIFT_Y];
   ['own', 'roadA', 'roadB', 'stones'].forEach(k => SITE[k] = SITE[k].map(sh));
@@ -592,15 +594,19 @@ const siteLabels = [];
     }
     if (ours) westLen += L;
   });
-  /* Schrägstützen am Westzaun: lange Seite an jedem 2. Steher und am Anfang, nicht an der Innenecke;
-     kurze Seite (ums Eck) nur 2 Stützen, ca. 3 m und 7 m nach der Ecke – der letzte Meter bleibt frei. */
+  /* Schrägstützen am Westzaun: lange Seite am Anfang, bei 2 m und 4 m, dann ab 10 m alle 4 m, nicht an der Innenecke;
+     kurze Seite (ums Eck) nur 1 Stütze am Rand, ca. 6,6 m nach der Ecke (zwischen zwei Stehern). */
   {
     const wp = westPosts.sort((p, q) => p.gs - q.gs).filter((p, i, arr) => i === 0 || p.gs - arr[i - 1].gs > 0.05);
     const cornerGs = westPosts.find(p => p.corner).gs;
-    const shortPick = [3, 7].map(d => wp.filter(p => p.gs > cornerGs).reduce((b, p) => Math.abs(p.gs - cornerGs - d) < Math.abs(b.gs - cornerGs - d) ? p : b));
+    // Punkt auf dem Zaun bei gs = Ecke + 6,6 m (zwischen den Stehern interpoliert)
+    {
+      const g = cornerGs + 6.6, j = wp.findIndex(p => p.gs >= g), p0 = wp[j - 1], p1 = wp[j], t = (g - p0.gs) / (p1.gs - p0.gs);
+      wp.push({ px: p0.px + (p1.px - p0.px) * t, pz: p0.pz + (p1.pz - p0.pz) * t, ix: p1.ix, iz: p1.iz, gs: g, extra: true });
+    }
     wp.forEach((p, i) => {
-      if (p.gs > cornerGs + 0.05) { if (!shortPick.includes(p)) return; }
-      else if (!(i === 0 || i % 2 === 1) || Math.abs(p.gs - cornerGs) < 2.1) return;
+      if (p.gs > cornerGs + 0.05) { if (!p.extra) return; }
+      else if (!(i === 0 || i === 1 || i === 2 || (i % 2 === 1 && i !== 3)) || Math.abs(p.gs - cornerGs) < 2.1) return;   // Stütze von 6 m auf 4 m vorgezogen
       braces.push({ top: [p.px + p.ix * 0.05, fg(p.px, true) + 1.2, p.pz + p.iz * 0.05], foot: [p.px + p.ix * 0.6, fg(p.px + p.ix * 0.6, true), p.pz + p.iz * 0.6] });
     });
   }
@@ -643,7 +649,26 @@ const siteLabels = [];
   });
 }
 
-/* Zäunchen aus stehendem Schwemmholz, ca. 1 m hoch: beginnt am ersten Steher des Lärchenzauns
+/* Schwemmholz: runde Äste unterschiedlicher Dicke (ca. 3–14 cm), dazwischen 2–7 cm Luft.
+   Liefert die Äste entlang eines Plan-Pfades (cm): [x, y, ux, uy, r (m)]. */
+function driftLogs(path, total, seed) {
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const segs = []; let acc = 0;
+  for (let i = 0; i < path.length - 1; i++) { const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]); segs.push([a, b, L, acc]); acc += L; }
+  const end = Math.min(total, acc), out = [];
+  let s = 2, rPrev = 0;
+  while (true) {
+    const r = rnd() < 0.12 ? 4.5 + rnd() * 2.5 : 1.5 + Math.pow(rnd(), 1.4) * 3.5;      // Radius in cm, ab und zu ein dicker Ast
+    s += rPrev + (rPrev ? 2 + rnd() * 5 : 0) + r;
+    if (s > end - 1) break;
+    const [a, b, L, a0] = segs.find(q => s <= q[3] + q[2]) || segs[segs.length - 1], t = (s - a0) / L;
+    out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (b[0] - a[0]) / L, (b[1] - a[1]) / L, r / 100]);
+    rPrev = r;
+  }
+  return out;
+}
+const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
+/* Zäunchen aus stehendem Schwemmholz (runde Äste, siehe driftLogs), ca. 1 m hoch: beginnt am ersten Steher des Lärchenzauns
    und läuft gebogen der Straße entlang, ca. 11 m, mit 1,45 m Abstand zum Asphalt der Straße. */
 {
   const C = [508, 378];                                   // Hausmitte, zeigt ins Grundstück
@@ -667,15 +692,15 @@ const siteLabels = [];
     left -= L;
   }
   const woodCols = ['#b9b2a6', '#a39a8d', '#cdc6b9', '#958c80', '#c2b8a8', '#ada392'].map(c => new THREE.Color(c));
-  const geo = new THREE.CylinderGeometry(1, 1.15, 1, 7);
-  const im = new THREE.InstancedMesh(geo, M('#ffffff', { roughness: 0.95, flatShading: true }), pts.length);
+  const logs = driftLogs(path, 1100, 7);
+  const im = new THREE.InstancedMesh(driftGeo, M('#ffffff', { roughness: 0.95 }), logs.length);
   const d = new THREE.Object3D();
   let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  pts.forEach(([x, y, ux, uy], i) => {
-    const r = 0.025 + rnd() * 0.035, h = 0.85 + rnd() * 0.3 + (x > -159 ? 0.17 : 0), j = (rnd() - 0.5) * 4;
+  logs.forEach(([x, y, ux, uy, r], i) => {
+    const h = 0.85 + rnd() * 0.3 + (x > -159 ? 0.17 : 0), j = (rnd() - 0.5) * 3;
     d.position.set(X(x - uy * j), GN + h / 2 - 0.03, Z(y + ux * j));
-    d.rotation.set((rnd() - 0.5) * 0.12, rnd() * 3, (rnd() - 0.5) * 0.12);
-    d.scale.set(r, h, r * (0.8 + rnd() * 0.3));
+    d.rotation.set((rnd() - 0.5) * 0.1, rnd() * 3, (rnd() - 0.5) * 0.1);
+    d.scale.set(r, h, r * (0.9 + rnd() * 0.15));
     d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, woodCols[Math.floor(rnd() * woodCols.length)]);
   });
   im.castShadow = im.receiveShadow = true; groups.site.add(im);
@@ -725,14 +750,15 @@ const siteLabels = [];
     for (let s = 0; s < L; s += 8) pts.push([a[0] + (b[0] - a[0]) * s / L, a[1] + (b[1] - a[1]) * s / L, (b[0] - a[0]) / L, (b[1] - a[1]) / L]);
   }
   const woodCols = ['#b9b2a6', '#a39a8d', '#cdc6b9', '#958c80', '#c2b8a8', '#ada392'].map(c => new THREE.Color(c));
-  const im = new THREE.InstancedMesh(new THREE.CylinderGeometry(1, 1.15, 1, 7), M('#ffffff', { roughness: 0.95, flatShading: true }), pts.length);
+  const logs = driftLogs(path, 1e9, 31);
+  const im = new THREE.InstancedMesh(driftGeo, M('#ffffff', { roughness: 0.95 }), logs.length);
   const d = new THREE.Object3D();
   let seed = 31; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  pts.forEach(([x, y, ux, uy], i) => {
-    const r = 0.025 + rnd() * 0.035, h = 0.85 + rnd() * 0.3, j = (rnd() - 0.5) * 4;
+  logs.forEach(([x, y, ux, uy, r], i) => {
+    const h = 0.85 + rnd() * 0.3, j = (rnd() - 0.5) * 3;
     d.position.set(X(x - uy * j), gAt(x) + h / 2 - 0.03, Z(y + ux * j));
-    d.rotation.set((rnd() - 0.5) * 0.12, rnd() * 3, (rnd() - 0.5) * 0.12);
-    d.scale.set(r, h, r * (0.8 + rnd() * 0.3));
+    d.rotation.set((rnd() - 0.5) * 0.1, rnd() * 3, (rnd() - 0.5) * 0.1);
+    d.scale.set(r, h, r * (0.9 + rnd() * 0.15));
     d.updateMatrix(); im.setMatrixAt(i, d.matrix); im.setColorAt(i, woodCols[Math.floor(rnd() * woodCols.length)]);
   });
   im.castShadow = im.receiveShadow = true; groups.site.add(im);
@@ -1059,6 +1085,7 @@ const siteLabels = [];
   const ct = calico();
   const katze = makeCat2(ct, ct, '#f2ede4', '#c9a23a');
   katze.position.set(X(-52), STRIP + 0.15, Z(360)); katze.rotation.y = Math.PI - 0.3; katze.scale.setScalar(0.92);
+  entry.cat = katze;
 }
 
 /* Holzbank beim westlichen Fallrohr, an der Hauswand auf dem Betonstreifen: 160 cm breit,
@@ -1134,9 +1161,10 @@ kiesBox(-9, 617, 766, 791, -0.65, STRIP - 0.03);
 // selbstgemachte Holzstiege mit 2 Stufen zur Haustür: vom Streifen (−0,30) in 2 × 15 cm bis auf Schwellenhöhe
 {
   const sw = M('#9b7652', { roughness: 0.85 }), y0 = 248, y1 = 378, r = -STRIP / 2;
-  box(-65, -9, y0, y1, STRIP, STRIP + r, sw, groups.site, { walk: true });          // untere Stufe
-  box(-37, -9, y0, y1, STRIP + r, -0.002, sw, groups.site, { walk: true });         // obere Stufe auf Höhe der Haustür
-  for (const y of [y0, y1 - 4]) box(-65, -9, y, y + 4, STRIP, 0.003, M('#86643f'), groups.site);   // Wangen
+  const og = entry.old = new THREE.Group(); og.userData.toggle = true; groups.site.add(og);
+  box(-65, -9, y0, y1, STRIP, STRIP + r, sw, og, { walk: true });          // untere Stufe
+  box(-37, -9, y0, y1, STRIP + r, -0.002, sw, og, { walk: true });         // obere Stufe auf Höhe der Haustür
+  for (const y of [y0, y1 - 4]) box(-65, -9, y, y + 4, STRIP, 0.003, M('#86643f'), og);   // Wangen
 }
 
 // Container Nord mit Balkon darauf (Dielen OK +2,96 = FFBOK OG, eben aus der Balkontür)
@@ -2181,7 +2209,7 @@ F(895, 985, 527, 722, 2.96, 3.41, mat.bed, groups.og); F(560, 760, 668, 728, 2.9
    Türblätter drehen sich um ihr Band. Beim Rundgang gehen sie auf, sobald man
    näher als 1,6 m herankommt, und schließen sich wieder, wenn man weg ist. */
 const doors = [];
-const doorMat = { white: M('#f6f5f1', { roughness: 0.6 }), entry: M('#6a4127', { roughness: 0.6 }), handle: km.steel };
+const doorMat = { white: M('#f6f5f1', { roughness: 0.6 }), entry: M('#6a4127', { roughness: 0.6 }), wood: M('#8b867d', { roughness: 0.9 }), handle: km.steel };
 function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', group }) {
   // axis: Richtung der Wand ('x' oder 'z'); t: Wandmitte quer (cm); a..b: lichte Öffnung entlang der Wand (cm)
   const w = (b - a - 12) / 100, h = top - base - 0.06, th = 0.04;
@@ -2193,7 +2221,7 @@ function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', grou
     parts.forEach(([cx, cy, sw, sh]) => { const m = new THREE.Mesh(new THREE.BoxGeometry(sw, sh, th), mat.frame); m.position.set(cx, cy, 0); m.castShadow = true; leaf.add(m); });
     const g = new THREE.Mesh(new THREE.BoxGeometry(w - 2 * bar, h - 2 * bar, 0.01), mat.glass); g.position.set(w / 2, h / 2, 0); g.renderOrder = 2; leaf.add(g);
   } else {
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), kind === 'entry' ? doorMat.entry : doorMat.white);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, th), kind === 'entry' ? doorMat.entry : kind === 'wood' ? doorMat.wood : doorMat.white);
     m.position.set(w / 2, h / 2, 0); m.castShadow = true; m.receiveShadow = true; leaf.add(m);
     if (kind === 'entry') { const s = new THREE.Mesh(new THREE.BoxGeometry(0.14, h * 0.7, 0.05), mat.glass); s.position.set(w * 0.5, h * 0.5, 0); leaf.add(s); }
   }
@@ -2270,6 +2298,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
     for (let k = 0; k < 70; k++) { g.fillStyle = 'rgba(60,55,50,0.12)'; g.fillRect(Math.random() * 128, 0, 1, 128); }
     return c;
   })();
+  carport.boardTex = (len, h) => { const t = new THREE.CanvasTexture(boardCanvas); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(0.2, len / 0.5), 1); return t; };
   const boardMat = len => {
     const t = new THREE.CanvasTexture(boardCanvas); t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(Math.max(0.2, len / 0.5), 1); t.anisotropy = 4;
@@ -2464,7 +2493,88 @@ const carport = { variants: [null], cars: null, roofs: [] };
      Schnee rutscht nach Osten ab, nicht vor die Einfahrt und nicht auf den Weg zur Haustür.
      Abstand Dachkante – Grenze zu 1004/4 ≥ 2 m (Oö. BauTG § 40 Z 2), deshalb beginnt es erst bei s 9,7 m. */
   const s3 = 970;
-  {
+
+  /* ===== Variante 4 = Variante 3 + geschlossene Westseite bis ans Haus und neuer Eingang =====
+     Die Westwand der Werkstatt läuft an deren Hinterecke im rechten Winkel zum Haus weiter: erst 1,1 m
+     parallel zur Hausfront, dann quer bis an die Hauswand (westlich der Haustür, vor dem Technikfenster).
+     Darin eine Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Nach Osten bleibt alles offen.
+     Statt des schrägen Gangdachs ein Glasdach in der Hausflucht (Stahlrahmen anthrazit): an der Hauswand
+     befestigt, liegt auf der neuen Wand und hängt an der hinteren Pfette des Carports – ohne eigene Stütze.
+     Leicht geneigt (2 %) zur Rinne an der Hausecke. Darunter eine Betonplatte wie im Carport.
+     Holzstiege: Podest 1,2 × 1,74 m knapp unter der Schwelle, rundum zwei Stufen (2 × 15,5 cm), vorne
+     zum Schotter eine dritte – von allen Seiten begehbar. */
+  const entrance = (V, F, hU) => {
+    const [Wx, Wy] = F.P(8.8, 7.0);                               // Hinterecke der Werkstatt außen (Plan-cm)
+    const [Ex, Ey0] = F.P(3.0, 7.0), [Ex1, Ey1] = F.P(8.8, 7.0);
+    const diagX = y => Ex + (y - Ey0) * (Ex1 - Ex) / (Ey1 - Ey0);    // Hinterkante Carport (b = 7,0) bei Plan-y
+    const yN = -9, yS = 455, xW = Wx;                              // Glasdach: Hausecke … neue Wand
+    const hC = y => 2.53 + 0.02 * (y - yN) / 100;                  // Unterkante Glasdach
+    const rg = new THREE.Group(); V.add(rg); carport.roofs.push(rg);
+    const glassPts = [[-9, yN], [-9, yS], [xW, yS], [Wx, Wy], [diagX(yN), yN]];
+    const tilt = (pts, d0, d1, m, parent, opts) => {
+      const sh = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(X(x), -Z(y))));
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: d1 - d0, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
+      const pa = geo.attributes.position;
+      for (let i = 0; i < pa.count; i++) pa.setY(i, pa.getY(i) + d0 + hC((pa.getZ(i) + 3.785) * 100));
+      geo.computeVertexNormals();
+      return addMesh(geo, m, parent, opts);
+    };
+    const gl = tilt(glassPts, 0.03, 0.045, tGlass, rg, { shadow: false }); gl.renderOrder = 2;
+    // Stahlrahmen: Randprofile und Sprossen quer zur Hauswand
+    const bar = (x0, x1, y0, y1, d = 0.12) => { const ym = (y0 + y1) / 2; box(x0, x1, y0, y1, hC(ym) + 0.045 - d, hC(ym) + 0.06, anth, rg); };
+    bar(-12, -9, yN, yS);                                           // Wandprofil
+    bar(diagX(yN), -9, yN - 6, yN + 2);                             // Traufe mit Rinne
+    box(diagX(yN), -9, yN - 14, yN - 6, hC(yN) - 0.04, hC(yN) + 0.04, anth, rg);   // Rinne
+    box(-22, -14, yN - 14, yN - 6, GN, hC(yN), anth, V);   // Fallrohr an der Hausecke
+    bar(xW, -9, yS - 8, yS);                                        // auf der neuen Wand
+    for (let y = 80; y < yS - 20; y += 90) bar(Math.max(diagX(y), xW), -9, y - 3, y + 3, 0.1);
+    // Randprofil an der Pfette entlang (schräg)
+    {
+      const a = [diagX(yN), yN], b = [Wx, Wy], L = Math.hypot(b[0] - a[0], b[1] - a[1]) / 100;
+      const m = addMesh(new THREE.BoxGeometry(L, 0.12, 0.06), anth, rg);
+      m.position.set(X((a[0] + b[0]) / 2), (hC(yN) + hC(Wy)) / 2 + 0.0, Z((a[1] + b[1]) / 2));
+      m.rotation.y = -Math.atan2((b[1] - a[1]), (b[0] - a[0]));
+    }
+    // Betonplatte unter dem Glasdach (wie im Carport)
+    slabPlan(glassPts, GN, GN + 0.03, M('#bdb9b1', { roughness: 0.95 }), V);
+    walkables.push(V.children[V.children.length - 1]);
+    // Westwand bis ans Haus, vergraute Lärche wie die Werkstatt, mit Tür auf dem Betonweg
+    const boards = (x0, x1, y0, y1, h0, h1) => {
+      const len = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)) / 100;
+      const mm = M('#ffffff', { roughness: 0.9 }); mm.map = carport.boardTex(len, h1 - h0);
+      return box(x0, x1, y0, y1, h0, h1, mm, V, { collide: true });
+    };
+    const dA = 90, d0 = -150, d1 = d0 + dA, top = STRIP + 2.05;
+    boards(xW, xW + 10, Wy - 6, yS, GN, hC(yS) + 0.0);                         // Stück parallel zur Hausfront
+    boards(xW, d0, yS - 10, yS, GN, hC(yS));                                    // quer zum Haus, vor der Tür
+    boards(d1, -9, yS - 10, yS, GN, hC(yS));                                    // … nach der Tür bis zur Hauswand
+    boards(d0, d1, yS - 10, yS, top, hC(yS));                                   // Sturz
+    box(d0 - 3, d0, yS - 11, yS + 1, STRIP, top, anth, V); box(d1, d1 + 3, yS - 11, yS + 1, STRIP, top, anth, V);   // Zarge
+    box(d0 - 3, d1 + 3, yS - 11, yS + 1, top, top + 0.03, anth, V);
+    doorLeaf({ axis: 'x', t: yS - 5, a: d0, b: d1, base: STRIP, top, hinge: 'a', swing: [0, -1], kind: 'wood', group: V });
+    // Holzstiege mit Podest
+    const deck = (() => {
+      const c = document.createElement('canvas'); c.width = 64; c.height = 16; const k = c.getContext('2d');
+      k.fillStyle = '#a77d52'; k.fillRect(0, 0, 64, 16); k.fillStyle = 'rgba(255,255,255,0.07)'; k.fillRect(0, 0, 20, 16);
+      k.fillStyle = '#4a3624'; k.fillRect(61, 0, 3, 16); return c; })();
+    const deckMat = (wx, wy) => { const t = new THREE.CanvasTexture(deck); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wx / 14.5, Math.max(1, wy / 100)); return M('#ffffff', { map: t, roughness: 0.85 }); };
+    const step = (x0, x1, y0, y1, h) => box(x0, x1, y0, y1, GN, h, deckMat(x1 - x0, y1 - y0), V, { walk: true });
+    step(-189, -9, 166, 335, -0.33);                                           // 3. Stufe (vorne zum Schotter)
+    step(-174, -9, 335, 444, -0.33);
+    step(-159, -9, 196, 430, -0.175);                                          // 2. Stufe rundum
+    step(-129, -9, 226, 400, -0.02);                                           // Podest knapp unter der Schwelle
+    // Stirnbretter dunkler (Kanten sichtbar)
+    const edge = M('#7a5a3a', { roughness: 0.85 });
+    [[-189, 166, 335, -0.33], [-159, 196, 430, -0.175], [-129, 226, 400, -0.02]].forEach(([x, y0, y1, h]) => box(x - 1, x + 1, y0, y1, h - 0.15, h, edge, V));
+    carport.onSwitch = v => {
+      const on = v === 4;
+      entry.old.visible = !on;
+      if (on) { entry.cat.position.set(X(-142), -0.175, Z(215)); entry.cat.rotation.y = Math.PI + 0.6; }
+      else { entry.cat.position.set(X(-52), STRIP + 0.15, Z(360)); entry.cat.rotation.y = Math.PI - 0.3; }
+    };
+  };
+  const buildPult = v4 => {
     const V = makeGroup(), F = frame(R0[0] + u[0] * s3, R0[1] + u[1] * s3, u[0], u[1], V);
     const fl = GN + 0.03, wood = M('#8b877f', { roughness: 0.9 });
     const ang = 7 * Math.PI / 180, tn = Math.tan(ang), hU = a => 2.30 + (a + 0.1) * tn;   // Dachunterkante bei a
@@ -2498,11 +2608,13 @@ const carport = { variants: [null], cars: null, roofs: [] };
     [8.4, 8.0, 7.6].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 4.6, fl + 0.01, Math.PI / 2));
     F.put(makeMower(), 8.25, 6.35, fl, 0);
     shelf(F, 5.95, 6.45, 3.6, 5.6);
-    walkway(V, F, 9.05, 4.5, 7.2);
+    if (v4) entrance(V, F, hU); else walkway(V, F, 9.05, 4.5, 7.2);
     hailApron(F, -0.1, 5.8, 0.78, hU);
     V.userData.carSpots = [[F, 1.45, 3.95, 'oct'], [F, 4.35, 3.8, 'p208']];
     carport.variants.push(V);
-  }
+  };
+  buildPult(false);
+  buildPult(true);
   // Ohne Carport (Ist): Autos auf dem Schotter vor dem Haus, gleich wie bei Variante 1
   {
     const g = new THREE.Group(); groups.site.add(g);
@@ -2591,6 +2703,7 @@ function setCarport(v) {
   // eine Variante mit noShelter blendet den Fahrradunterstand aus, danach wie vorher
   if (carport.variants[v].userData.noShelter) { if (carport.shelterBefore === undefined) carport.shelterBefore = shelterG.visible; shelterG.visible = false; }
   else if (carport.shelterBefore !== undefined) { shelterG.visible = carport.shelterBefore; carport.shelterBefore = undefined; }
+  if (carport.onSwitch) carport.onSwitch(v);
   placeCars(v);
   refreshActive();
 }
@@ -2739,6 +2852,7 @@ const cpTexts = [
   '<b>Anbau am Haus:</b> Flachdach in der Hausflucht, 9,2 × 6 m, reicht direkt über die Haustür – trocken vom Auto ins Haus. Abstellraum 3,2 × 2 m im Westen (2 Räder, Mäher, Werkbank). Betonweg an der Wärmepumpe vorbei in den Garten bleibt frei und ist bis zur Hausecke überdacht. Einfahrt schräg zur Straße: 1 m (Westecke) bis 6,7 m (Osten) → mehr Schnee räumen.',
   '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
   '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
+  '<b>Wie Var. 3, Westseite bis ans Haus zu:</b> Die Werkstattwand läuft im rechten Winkel weiter bis an die Hauswand (westlich der Haustür), mit Holztür zum Betonweg Richtung Wärmepumpe und Garten. Nach Osten offen. Statt des schrägen Gangdachs ein Glasdach in der Hausflucht: an der Hauswand, auf der neuen Wand und an der Carport-Pfette aufgehängt, ohne Stütze, Rinne an der Hausecke. Darunter Beton wie im Carport. Neue Holzstiege: Podest 1,2 × 1,7 m knapp unter der Schwelle, rundum Stufen, von allen Seiten begehbar.',
 ];
 const cpBtns = document.querySelectorAll('[data-cp]');
 function showCarport(v) {
