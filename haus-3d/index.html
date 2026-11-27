@@ -102,6 +102,12 @@
   body.measuring #stage canvas { cursor: crosshair; }
   .label.measure { background: #e4572e; color: #fff; border-color: transparent; font-size: 12.5px; }
   .label.measure span { color: rgba(255,255,255,0.85); }
+  #fs {
+    position: absolute; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+    width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+    display: grid; place-items: center; cursor: pointer; backdrop-filter: blur(10px); box-shadow: 0 4px 16px rgba(0,0,0,0.15);
+  }
+  #fs .off { display: none; } body.fullscreen #fs .on { display: none; } body.fullscreen #fs .off { display: block; }
   #err { position: absolute; inset: auto 16px 16px 16px; z-index: 9; background: var(--panel); padding: 12px; border-radius: 8px; border: 1px solid var(--line); }
   @media (max-width: 520px) { .panel { width: auto; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px)); } .hud { top: auto; bottom: calc(160px + env(safe-area-inset-bottom, 0px)); } }
 </style>
@@ -110,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 11:45</small></h1>
+  <h1>Unser Wolf-Haus <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 12:00</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -155,6 +161,10 @@
 </section>
 
 <div class="hud" id="hud" hidden>Außen</div>
+<button id="fs" aria-pressed="false" aria-label="Vollbild" title="Vollbild">
+  <svg class="on" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  <svg class="off" viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M9 4v5H4M20 9h-5V4M15 20v-5h5M4 15h5v5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+</button>
 <button id="measure" aria-pressed="false" aria-label="Strecke messen" title="Strecke messen">
   <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M3 15.5 15.5 3 21 8.5 8.5 21z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 12.5l1.6 1.6M9.5 10l2.2 2.2M12 7.5l1.6 1.6M14.5 5l2.2 2.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
 </button>
@@ -1503,12 +1513,11 @@ function tiltPanel(x0, x1, y0, y1, dir, top, thick, material, shadow = true) {
     [-1, 1].forEach(sd2 => {
       const T = new THREE.Vector3(0, yT, 0), F = new THREE.Vector3(sd2 * yT, 0, 0);
       [-1, 1].forEach(e => beam(F, T, 0.045, 0.12, ladderM, zc + e * LW / 2));
-      for (let h = 0.25; h < yT - 0.4; h += 0.25) {                   // Trittstufen (wie bei einer Treppe flach), oberste weggelassen
+      for (let h = 0.25; h < yT - 0.1 - 0.25; h += 0.25) {            // Trittstufen (wie bei einer Treppe flach), oberste je Seite weggelassen
         const st = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.03, LW), ladderM);
         st.position.set(sd2 * (yT - h), h, zc); st.castShadow = true; g.add(st);
       }
     });
-    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.08, LW + 0.05), ladderM); cap.position.set(0, yT, zc); cap.castShadow = true; g.add(cap);
   }
   /* Matschküche aus vergrautem Holz an der Westseite (lokal +z), ganz an der Giebelwand mit dem Fenster: beim Kochen schaut man nach Osten
      (zum Häuschen). Arbeitsplatte auf Kinderhöhe, Rückwand mit Haken, Schüssel als Spüle, Herdplatten, Töpfe. */
@@ -2949,6 +2958,24 @@ renderer.setAnimationLoop(() => {
   renderer.render(scene, camera);
   labelRenderer.render(scene, camera);
 });
+
+/* Vollbild: echtes Browser-Vollbild (Menü und Bedienelemente bleiben sichtbar). */
+{
+  const b = document.getElementById('fs'), de = document.documentElement;
+  const fsEl = () => document.fullscreenElement || document.webkitFullscreenElement;
+  if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) b.style.display = 'none';   // z. B. iPhone: kein Vollbild möglich
+  const set = on => { document.body.classList.toggle('fullscreen', on); b.setAttribute('aria-pressed', on); b.title = b.ariaLabel = on ? 'Vollbild beenden' : 'Vollbild'; setTimeout(() => window.dispatchEvent(new Event('resize')), 50); };
+  b.addEventListener('click', async () => {
+    const on = !document.body.classList.contains('fullscreen');
+    set(on);
+    try {
+      if (on && !fsEl()) await (de.requestFullscreen ? de.requestFullscreen() : de.webkitRequestFullscreen?.());
+      else if (!on && fsEl()) await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen?.());
+    } catch (e) { set(false); /* Vollbild nicht erlaubt */ }
+  });
+  const sync = () => { if (!fsEl() && document.body.dataset.fsReal) { delete document.body.dataset.fsReal; set(false); } else if (fsEl()) document.body.dataset.fsReal = 1; };
+  document.addEventListener('fullscreenchange', sync); document.addEventListener('webkitfullscreenchange', sync);
+}
 </script>
 
 </body></html>
