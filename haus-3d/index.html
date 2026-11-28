@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:15</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:25</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -2696,7 +2696,17 @@ const carport = { variants: [null], cars: null, roofs: [] };
     woodStair(V);
     hailApron(F, 3.05, aC, 0.02, H);
     V.userData.carSpots = [[F, 4.75, 3.05, 'oct'], [F, 7.4, 3.47, 'p208']];   // 208 etwas näher an Wand und Oct: Westecke bleibt unterm Dach
-    V.userData.noShelter = true;                                                 // Fahrradunterstand in dieser Ansicht aus
+    V.userData.noShelter = true;
+    // Flächen für die Beschriftung in den Ansichten EG/OG offen (lichte Maße innen)
+    {
+      const poly = pts => Math.abs(pts.reduce((t, [x, y], k) => { const [u, w] = pts[(k + 1) % pts.length]; return t + x * w - u * y; }, 0)) / 2;
+      const aI = 9.15, bCi = bC * (aI - aC) / (9.25 - aC);                           // Innenkante Westwand, Abschrägung dort
+      const fmt = m2 => m2.toFixed(1).replace('.', ',') + ' m²';
+      const work = (2.95 - (aE + 0.15)) * ((bW - 0.1) - (bF + 0.35));
+      const cars = poly([[3.05, 0], [aC, 0], [aI, bCi], [aI, bW - 0.1], [3.05, bW - 0.1]]);
+      const glass = (aI - aG) * (bH - (bW + 0.05));
+      V.userData.areaLabels = [['Werkstatt', fmt(work), F.P(1.3, 1.6)], ['Stellplätze', fmt(cars), F.P(6.05, 0.9)], ['Glas-Vorraum', fmt(glass), F.P(7.3, 7.0)]];
+    }                                                 // Fahrradunterstand in dieser Ansicht aus
     carport.variants.push(V);
   }
   // Ohne Carport (Ist): Autos auf dem Schotter vor dem Haus, gleich wie bei Variante 1
@@ -2829,6 +2839,7 @@ function setCarport(v) {
   else if (carport.shelterBefore !== undefined) { shelterG.visible = carport.shelterBefore; carport.shelterBefore = undefined; }
   if (carport.onSwitch) carport.onSwitch(v);
   placeCars(v);
+  if (typeof showCpLabels === 'function' && labels.cp) showCpLabels();
   refreshActive();
 }
 
@@ -2863,6 +2874,15 @@ rooms.forEach(rm => {
   labels[rm.floor].push(o);
 });
 
+// Carport-Flächen (nur Varianten mit areaLabels, in EG/OG offen)
+labels.cp = [];
+carport.variants.forEach((V, i) => (V && V.userData.areaLabels || []).forEach(([name, area, [px, py]]) => {
+  const el = document.createElement('div'); el.className = 'label'; el.innerHTML = `${name}<span>${area}</span>`;
+  const o = new CSS2DObject(el); o.position.set(X(px), 0.6, Z(py)); o.visible = false; o.userData.variant = i;
+  scene.add(o); labels.cp.push(o);
+}));
+const showCpLabels = () => labels.cp.forEach(o => o.visible = view !== 'aussen' && carport.current === o.userData.variant);
+
 /* ---------- Ansichten ---------- */
 let view = 'aussen';
 function setView(v) {
@@ -2872,6 +2892,7 @@ function setView(v) {
   carport.roofs.forEach(r => r.visible = v === 'aussen');
   labels.eg.forEach(l => l.visible = v === 'eg');
   labels.og.forEach(l => l.visible = v === 'og');
+  if (labels.cp) showCpLabels();
   ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).setAttribute('aria-pressed', String(k === v)));
 }
 ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).addEventListener('click', () => {
