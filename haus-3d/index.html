@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:20</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:30</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -127,6 +127,7 @@
     </div>
     <div class="jumps toggles" style="margin-top:8px">
       <button class="btn" id="tLabels" aria-pressed="false">Grundstücksbezeichnungen</button>
+      <button class="btn" id="tRooms" aria-pressed="false" title="Flächen und Maße, in EG offen / OG offen">Raum-Infos</button>
       <button class="btn" id="doorView">Aus der Haustür</button>
     </div>
   </div>
@@ -2966,18 +2967,18 @@ carport.variants.forEach((V, i) => (V && V.userData.areaLabels || []).forEach(([
   const o = new CSS2DObject(el); o.position.set(X(713), 1.0, Z(-185)); o.visible = false; o.userData.variant = -1;
   scene.add(o); labels.cp.push(o);
 }
-const showCpLabels = () => labels.cp.forEach(o => o.visible = view !== 'aussen' && (o.userData.variant < 0 || carport.current === o.userData.variant));
+const showCpLabels = () => labels.cp.forEach(o => o.visible = roomInfo && view !== 'aussen' && (o.userData.variant < 0 || carport.current === o.userData.variant));
 
 /* ---------- Ansichten ---------- */
-let view = 'aussen';
+let view = 'aussen', roomInfo = false;                // Raum-Infos (m², Maße) standardmäßig aus
 function setView(v) {
   view = v;
   groups.roof.visible = v === 'aussen';
   groups.og.visible = v !== 'eg';
   carport.roofs.forEach(r => r.visible = v === 'aussen');
   balconyG.visible = v === 'aussen';
-  labels.eg.forEach(l => l.visible = v === 'eg');
-  labels.og.forEach(l => l.visible = v === 'og');
+  labels.eg.forEach(l => l.visible = roomInfo && v === 'eg');
+  labels.og.forEach(l => l.visible = roomInfo && v === 'og');
   if (labels.cp) showCpLabels();
   ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).setAttribute('aria-pressed', String(k === v)));
 }
@@ -3105,6 +3106,10 @@ const toggleBtn = (id, obj) => {
 };
 toggleBtn('tCars', carport.cars);
 toggleBtn('tShelter', shelterG);
+document.getElementById('tRooms').addEventListener('click', e => {
+  roomInfo = !roomInfo; e.currentTarget.setAttribute('aria-pressed', String(roomInfo));
+  if (roomInfo && view === 'aussen') setView('eg'); else setView(view);   // in der Außenansicht gibt's keine Räume: dann EG offen
+});
 // Grundstücksbezeichnungen (Parzellennummern), standardmäßig aus
 let showSiteLabels = false;
 siteLabels.forEach(l => l.visible = false);
