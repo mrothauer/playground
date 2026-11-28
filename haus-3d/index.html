@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:25</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:45</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -288,6 +288,21 @@ const mat = {
   grass: M('#7f9e5a'), paving: M('#b3aea6'), container: M('#e9e7e1'), rail: M('#3e3a36'),
   white: M('#f7f7f5'), sofa: M('#6b7b8c'), bed: M('#dcd6cc'), stair: M('#b98b58'),
   dark: M('#4a4d50'), steel: M('#9aa0a6', { metalness: 0.4, roughness: 0.5 }),
+};
+/* Putzfassade: leichte Körnung (Reibputz) und sanfte Wolken, im Shader über die Weltposition –
+   gleichmäßig auf allen Wänden, unabhängig von der Größe der einzelnen Boxen. */
+mat.facade.onBeforeCompile = sh => {
+  sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vPutz;')
+    .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvPutz = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+  sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+varying vec3 vPutz;
+float hP(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
+float nP(vec3 p) { vec3 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(hP(i), hP(i + vec3(1,0,0)), f.x), mix(hP(i + vec3(0,1,0)), hP(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(hP(i + vec3(0,0,1)), hP(i + vec3(1,0,1)), f.x), mix(hP(i + vec3(0,1,1)), hP(i + vec3(1,1,1)), f.x), f.y), f.z); }`)
+    .replace('#include <color_fragment>', `#include <color_fragment>
+float putz = (nP(vPutz * 90.0) - 0.5) * 0.11 + (nP(vPutz * 22.0) - 0.5) * 0.06 + (nP(vPutz * 1.6) - 0.5) * 0.035;
+diffuseColor.rgb *= 1.0 + putz;`);
 };
 
 // Gruppen für die Ansichten
@@ -1181,7 +1196,20 @@ kiesBox(-9, 617, 766, 791, -0.65, STRIP - 0.03);
   // Ostende bündig mit der Hausfront mit dem großen Fenster ② (x 1026)
   // Container steht auf einem ca. 40 cm hohen Sockel (braun wie der Haussockel), Standardhöhe 2,59 m
   box(400, 1026, -330, -39, -0.65, -0.07, mat.plinth, groups.site, { collide: true });
-  box(400, 1026, -330, -39, -0.07, 2.52, green, groups.site, { collide: true });
+  // hohl, damit man in EG/OG offen hineinschauen kann: 4 cm Wände, Boden innen hell, Dach = Balkon (ausblendbar)
+  const inner = M('#e4e2da', { roughness: 0.8 }), wl = 4, cH = 2.52;
+  box(400, 1026, -330, -39, -0.07, -0.04, M('#b9b2a3', { roughness: 0.9 }), groups.site, { walk: true });
+  box(400, 400 + wl, -330, -39, -0.07, cH, green, groups.site, { collide: true });                     // Nord
+  box(400 + wl, 1026 - wl, -330, -330 + wl, -0.07, cH, green, groups.site, { collide: true });          // Ost
+  box(400 + wl, 1026 - wl, -39 - wl, -39, -0.07, cH, green, groups.site, { collide: true });            // West (zum Haus)
+  box(1026 - wl, 1026, -330, -230, -0.07, cH, green, groups.site, { collide: true });                    // Süd, mit Türöffnung
+  box(1026 - wl, 1026, -138, -39, -0.07, cH, green, groups.site, { collide: true });
+  box(1026 - wl, 1026, -230, -138, 2.0, cH, green, groups.site);
+  box(400 + wl, 400 + wl + 0.5, -330 + wl, -39 - wl, -0.04, cH - 0.02, inner, groups.site, { shadow: false });   // Innenverkleidung
+  box(1026 - wl - 0.5, 1026 - wl, -330 + wl, -230, -0.04, cH - 0.02, inner, groups.site, { shadow: false });
+  box(1026 - wl - 0.5, 1026 - wl, -138, -39 - wl, -0.04, cH - 0.02, inner, groups.site, { shadow: false });
+  box(400 + wl, 1026 - wl, -330 + wl, -330 + wl + 0.5, -0.04, cH - 0.02, inner, groups.site, { shadow: false });
+  box(400 + wl, 1026 - wl, -39 - wl - 0.5, -39 - wl, -0.04, cH - 0.02, inner, groups.site, { shadow: false });
   // Sickenprofil an den sichtbaren Seiten
   for (let x = 415; x < 1018; x += 28) box(x, x + 12, -333, -330, -0.02, 2.47, greenDark, groups.site, { shadow: false });
   for (let y = -315; y < -50; y += 28) { box(1026, 1029, y, y + 12, -0.02, 2.47, greenDark, groups.site, { shadow: false }); box(397, 400, y, y + 12, -0.02, 2.47, greenDark, groups.site, { shadow: false }); }
@@ -1192,13 +1220,15 @@ kiesBox(-9, 617, 766, 791, -0.65, STRIP - 0.03);
   box(1033, 1038, -152, -133, 1.05, 1.085, M('#1b1c1e', { roughness: 0.4 }), groups.site);
   // Das Vordach über der Tür wird beim Terrassendach gebaut (bündiger Anschluss)
 }
-// Balkon: reicht nach Westen bis zum Ende des Stiegenhausfensters ⑧ (x 400), Lärchendielen
-box(400, 1026, -330, -9, 2.52, 2.90, mat.slab, groups.site);
-box(400, 1026, -330, -9, 2.90, 2.945, M('#5e4a35'), groups.site, { walk: true, shadow: false });
+// Balkon: reicht nach Westen bis zum Ende des Stiegenhausfensters ⑧ (x 400), Lärchendielen.
+// Eigene Gruppe: in EG/OG offen ausgeblendet, damit man in den Container schaut.
+const balconyG = new THREE.Group(); groups.site.add(balconyG);
+box(400, 1026, -330, -9, 2.52, 2.90, mat.slab, balconyG);
+box(400, 1026, -330, -9, 2.90, 2.945, M('#5e4a35'), balconyG, { walk: true, shadow: false });
 {
   const larch = [M('#9e988e', { roughness: 0.9 }), M('#938d83', { roughness: 0.9 }), M('#a8a297', { roughness: 0.9 })];   // vergraut
   let k = 0;
-  for (let x = 401; x < 1025; x += 14.5) box(x, Math.min(x + 13.5, 1025), -329, -10, 2.945, 2.96, larch[k++ % 3], groups.site, { shadow: false });
+  for (let x = 401; x < 1025; x += 14.5) box(x, Math.min(x + 13.5, 1025), -329, -10, 2.945, 2.96, larch[k++ % 3], balconyG, { shadow: false });
 }
 // Holzgeländer mit Bambus-Sichtschutz
 const bambooTex = (() => {
@@ -1222,15 +1252,15 @@ function woodRailing(x0, x1, y0, y1) {
   const h0 = 2.96, h1 = 3.96, alongX = Math.abs(x1 - x0) > Math.abs(y1 - y0);
   const len = (alongX ? x1 - x0 : y1 - y0) / 100;
   const tex = bambooTex.clone(); tex.needsUpdate = true; tex.repeat.set(len / 1.2, 1);
-  const panel = alongX ? box(x0, x1, (y0 + y1) / 2 - 1, (y0 + y1) / 2 + 1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), groups.site, { collide: true })
-                       : box((x0 + x1) / 2 - 1, (x0 + x1) / 2 + 1, y0, y1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), groups.site, { collide: true });
+  const panel = alongX ? box(x0, x1, (y0 + y1) / 2 - 1, (y0 + y1) / 2 + 1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), balconyG, { collide: true })
+                       : box((x0 + x1) / 2 - 1, (x0 + x1) / 2 + 1, y0, y1, h0 + 0.06, h1 - 0.08, M('#ffffff', { map: tex, roughness: 0.85 }), balconyG, { collide: true });
   if (!alongX) panel.rotation.y = 0;
-  box(x0 - 2, x1 + 2, y0 - 2, y1 + 2, h1 - 0.05, h1, railWood, groups.site, { collide: true });        // Handlauf
-  box(x0, x1, y0, y1, h0 + 0.03, h0 + 0.07, railWood, groups.site);                                      // Unterholm
+  box(x0 - 2, x1 + 2, y0 - 2, y1 + 2, h1 - 0.05, h1, railWood, balconyG, { collide: true });        // Handlauf
+  box(x0, x1, y0, y1, h0 + 0.03, h0 + 0.07, railWood, balconyG);                                      // Unterholm
   const n = Math.max(1, Math.round(len / 1.2));
   for (let i = 0; i <= n; i++) {
     const t = i / n, cx = x0 + (x1 - x0) * t, cy = y0 + (y1 - y0) * t;
-    box(cx - 4.5, cx + 4.5, cy - 4.5, cy + 4.5, h0, h1 - 0.05, railWood, groups.site);
+    box(cx - 4.5, cx + 4.5, cy - 4.5, cy + 4.5, h0, h1 - 0.05, railWood, balconyG);
   }
 }
 const railH = [2.85, 3.80];
@@ -2216,7 +2246,7 @@ F(895, 985, 527, 722, 2.96, 3.41, mat.bed, groups.og); F(560, 760, 668, 728, 2.9
    näher als 1,6 m herankommt, und schließen sich wieder, wenn man weg ist. */
 const doors = [];
 const doorMat = { white: M('#f6f5f1', { roughness: 0.6 }), entry: M('#6a4127', { roughness: 0.6 }), wood: M('#8b867d', { roughness: 0.9 }), handle: km.steel };
-function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', group }) {
+function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', group, rest = 0 }) {
   // axis: Richtung der Wand ('x' oder 'z'); t: Wandmitte quer (cm); a..b: lichte Öffnung entlang der Wand (cm)
   const w = (b - a - 12) / 100, h = top - base - 0.06, th = 0.04;
   const pivot = new THREE.Group();
@@ -2246,7 +2276,8 @@ function doorLeaf({ axis, t, a, b, base, top, hinge, swing, kind = 'white', grou
   pivot.rotation.y = baseRot;
   group.add(pivot);
   const cx = axis === 'x' ? X((a + b) / 2) : X(t), cz = axis === 'x' ? Z(t) : Z((a + b) / 2);
-  doors.push({ pivot, baseRot, openRot, cx, cz, base, cur: 0 });
+  pivot.rotation.y = baseRot + (openRot - baseRot) * rest;
+  doors.push({ pivot, baseRot, openRot, cx, cz, base, cur: rest, rest });   // rest: Ruhestellung (0 zu, 1 ganz offen)
 }
 // EG
 doorLeaf({ axis: 'x', t: 237.5, a: 45, b: 133, base: 0, top: 2.065, hinge: 'a', swing: [0, -1], group: groups.eg });              // WC
@@ -2268,7 +2299,7 @@ box(1000, 1014, 541, 545, 0, 2.225, mat.frame, groups.eg);
 function updateDoors(dt) {
   for (const d of doors) {
     const near = walking && Math.hypot(player.x - d.cx, player.z - d.cz) < 1.6 && Math.abs(player.feet - d.base) < 1.2;
-    d.cur += ((near ? 1 : 0) - d.cur) * Math.min(1, dt * 5);
+    d.cur += ((near ? 1 : d.rest) - d.cur) * Math.min(1, dt * 5);
     d.pivot.rotation.y = d.baseRot + (d.openRot - d.baseRot) * d.cur;
   }
 }
@@ -2665,7 +2696,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
     const wT = fl + 2.05;
     F.wallL('a', 3.05, 5.55, bW, 0.1, fl, wT); F.wallL('a', 6.55, 9.2, bW, 0.1, fl, wT);
     [5.52, 6.55].forEach(a => F.lb(a, a + 0.03, bW - 0.06, bW + 0.06, fl, wT, anth));              // Zarge
-    doorLeaf({ axis: 'z', t: OX + bW * 100, a: OY + 555, b: OY + 655, base: fl, top: wT, hinge: 'a', swing: [1, 0], kind: 'wood', group: V });   // Holztür, schwenkt in den Hof
+    doorLeaf({ axis: 'z', t: OX + bW * 100, a: OY + 555, b: OY + 655, base: fl, top: wT, hinge: 'b', swing: [1, 0], kind: 'wood', group: V, rest: 0.18 });   // Holztür, rechts angeschlagen (vom Auto aus), geht zum Haus hin auf, leicht offen
     F.lb(3.05, 9.2, bW - 0.06, bW + 0.06, wT, wT + 0.05, anth);                                     // Glasband: Rahmen unten …
     F.lb(3.05, 9.2, bW - 0.01, bW + 0.01, wT + 0.05, H - 0.02, glassM, { shadow: false }).renderOrder = 2;
     [3.1, 4.6, 6.05, 7.55, 9.05].forEach(a => F.lb(a - 0.03, a + 0.03, bW - 0.05, bW + 0.05, wT, H, anth));
@@ -2881,7 +2912,13 @@ carport.variants.forEach((V, i) => (V && V.userData.areaLabels || []).forEach(([
   const o = new CSS2DObject(el); o.position.set(X(px), 0.6, Z(py)); o.visible = false; o.userData.variant = i;
   scene.add(o); labels.cp.push(o);
 }));
-const showCpLabels = () => labels.cp.forEach(o => o.visible = view !== 'aussen' && carport.current === o.userData.variant);
+{
+  const el = document.createElement('div'); el.className = 'label';
+  el.innerHTML = `Container<span>${((1026 - 400 - 8) * (330 - 39 - 8) / 1e4).toFixed(1).replace('.', ',')} m²</span>`;
+  const o = new CSS2DObject(el); o.position.set(X(713), 1.0, Z(-185)); o.visible = false; o.userData.variant = -1;
+  scene.add(o); labels.cp.push(o);
+}
+const showCpLabels = () => labels.cp.forEach(o => o.visible = view !== 'aussen' && (o.userData.variant < 0 || carport.current === o.userData.variant));
 
 /* ---------- Ansichten ---------- */
 let view = 'aussen';
@@ -2890,6 +2927,7 @@ function setView(v) {
   groups.roof.visible = v === 'aussen';
   groups.og.visible = v !== 'eg';
   carport.roofs.forEach(r => r.visible = v === 'aussen');
+  balconyG.visible = v === 'aussen';
   labels.eg.forEach(l => l.visible = v === 'eg');
   labels.og.forEach(l => l.visible = v === 'og');
   if (labels.cp) showCpLabels();
