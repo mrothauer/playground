@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 10:20</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 10:50</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -857,21 +857,24 @@ const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
 
 /* Luft-Wärmepumpe (Außeneinheit, ca. 110 × 77 × 45 cm) an der Hausecke westlich der Haustür,
    auf dem Beton der schmalen Terrasse an deren Außenseite, bündig mit der Hausfront (x −9).
-   Der Ventilator zeigt nach Norden (Plan-Westen, zur Straße). */
-{
-  const x0 = -159, x1 = -114, y0 = 656, y1 = 766, base = STRIP;   // bündig mit Betonkante (Norden) und Hauswand-Flucht (Westseite), auf dem Beton
+   Der Ventilator zeigt nach Norden (Plan-Westen, zur Straße).
+   heatPump(dy, g, dx): um dy (cm) nach Westen und dx zur Straße versetzt in Gruppe g (Var. 1b setzt sie vor die neue Westwand). */
+function heatPump(dy, g, dx = 0) {
+  const x0 = -159 + dx, x1 = -114 + dx, y0 = 656 + dy, y1 = 766 + dy, base = STRIP;   // bündig mit Betonkante (Norden) und Hauswand-Flucht (Westseite), auf dem Beton
   const hpGrey = M('#d5d8da', { roughness: 0.5 }), hpDark = M('#2b2e31', { roughness: 0.6 }), steelG = M('#9aa0a6', { metalness: 0.4, roughness: 0.4 });
-  box(x0, x1, y0 + 8, y0 + 14, base, base + 0.12, hpDark, groups.site);                          // Standfüße
-  box(x0, x1, y1 - 14, y1 - 8, base, base + 0.12, hpDark, groups.site);
-  box(x0, x1, y0, y1, base + 0.12, base + 0.12 + 0.765, hpGrey, groups.site, { collide: true }); // Gehäuse
-  box(x0, x1, y0, y1, base + 0.86, base + 0.885, M('#f4f4f1', { roughness: 0.45 }), groups.site); // Deckel weiß
+  box(x0, x1, y0 + 8, y0 + 14, base, base + 0.12, hpDark, g);                          // Standfüße
+  box(x0, x1, y1 - 14, y1 - 8, base, base + 0.12, hpDark, g);
+  box(x0, x1, y0, y1, base + 0.12, base + 0.12 + 0.765, hpGrey, g, { collide: true }); // Gehäuse
+  box(x0, x1, y0, y1, base + 0.86, base + 0.885, M('#f4f4f1', { roughness: 0.45 }), g); // Deckel weiß
   const fy = y0 + 42, fh = base + 0.12 + 0.39;
-  const fan = addMesh(new THREE.CylinderGeometry(0.27, 0.27, 0.012, 32), hpDark, groups.site, { shadow: false });
+  const fan = addMesh(new THREE.CylinderGeometry(0.27, 0.27, 0.012, 32), hpDark, g, { shadow: false });
   fan.rotation.z = Math.PI / 2; fan.position.set(X(x0) - 0.006, fh, Z(fy));
-  const ring = addMesh(new THREE.TorusGeometry(0.27, 0.012, 8, 40), steelG, groups.site, { shadow: false });
+  const ring = addMesh(new THREE.TorusGeometry(0.27, 0.012, 8, 40), steelG, g, { shadow: false });
   ring.rotation.y = Math.PI / 2; ring.position.set(X(x0) - 0.014, fh, Z(fy));
-  for (let i = -2; i <= 2; i++) { const bar = addMesh(new THREE.BoxGeometry(0.008, 0.008, 0.54), steelG, groups.site, { shadow: false }); bar.position.set(X(x0) - 0.016, fh + i * 0.1, Z(fy)); }
+  for (let i = -2; i <= 2; i++) { const bar = addMesh(new THREE.BoxGeometry(0.008, 0.008, 0.54), steelG, g, { shadow: false }); bar.position.set(X(x0) - 0.016, fh + i * 0.1, Z(fy)); }
 }
+const hpOld = new THREE.Group(); hpOld.userData.toggle = true; groups.site.add(hpOld);
+heatPump(0, hpOld);
 
 /* Pflastersteine: ab dem Nordost-Spitz genau 10 m entlang der Straßengrenze, nur als ca. 10 cm breite
    Begrenzung direkt an der Grenze. Der frühere Bankettstreifen ist auf dieser Länge asphaltiert. */
@@ -2513,6 +2516,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
   carport.onSwitch = v => {
     const on = v === 4 || v === 5;                                             // Var. 4 und 1b mit neuer Stiege
     entry.old.visible = !on;
+    hpOld.visible = v !== 5;                                                  // Var. 1b: Wärmepumpe vor der neuen Westwand
     if (on) { entry.cat.position.set(X(-131), -0.175, Z(222)); entry.cat.rotation.y = Math.PI + 0.6; }
     else { entry.cat.position.set(X(-52), STRIP + 0.15, Z(360)); entry.cat.rotation.y = Math.PI - 0.3; }
   };
@@ -2625,16 +2629,18 @@ const carport = { variants: [null], cars: null, roofs: [] };
   buildPult(true);
 
   /* ===== Variante 1b: wie Var. 1 (Flachdach in der Hausflucht), aber mit Eingangshof =====
-     Rahmen: a entlang Plan +y (Westen) ab y −325, b entlang Plan +x (zum Haus) ab x −840.
-     Werkstatt im Osten (a 0,05–3,05 × b −1,45–5,7, also x −985 … −270), bündig mit der Holzwand; Dachkante y −325 → 2 m zur Grenze 1004/4. Stellplätze a 3,05–6,05 und 6,05–9,05.
+     Rahmen: a entlang Plan +y (Westen) ab y −149, b entlang Plan +x (zum Haus) ab x −840.
+     Werkstatt im Osten (a 0,05–3,05 × b −1,45–5,7, also x −985 … −270), bündig mit der Holzwand; Dachkante y −149 → 3,8 m zur Grenze 1004/4. Stellplätze a 3,05–6,05 und 6,05–9,05.
      Vor den Autos eine Holzwand (x −270) mit Holztür zwischen den Autos, darüber ein Glasband –
      die Autos stehen nicht mehr direkt vor der Haustür. Zwischen Wand und Haus ein Eingangshof:
      Glasdach, im Osten die Werkstatt (Tür in den Hof), im Westen eine Holzwand mit Tür auf dem Betonweg
-     zur Wärmepumpe, in der Mitte die neue Holzstiege. Westecke zur Straße abgeschrägt (≥ 1 m Abstand). */
+     zur Wärmepumpe, in der Mitte die neue Holzstiege. Westecke zur Straße abgeschrägt (0,9 m). Wärmepumpe außen vor der Westwand. */
   {
-    const OX = -840, V = makeGroup(), F = frame(OX, -325, 0, 1, V);   // 30 cm näher am Haus als zuerst
+    const OX = -840, OY = -149, V = makeGroup(), F = frame(OX, OY, 0, 1, V);   // Westwand außen bündig mit der Hauskante (y 766)
     const fl = GN + 0.03, H = 2.30, bW = 5.7, bH = 8.31;               // bW: Holzwand vor dem Hof, bH: Hauswand (x −9)
-    const aC = 8.15, bC = 0.93;                                          // Abschrägung an der Straße (a 8,15 / b 0 → a 9,15 / b 0,93)
+    // Abschrägung an der Straße: 0,9 m Abstand zur Grundgrenze (Linie parallel zur Straße)
+    const dS = 90, xS = y => onD(dS, y)[0], k = xS(1) - xS(0), yC = (OX - xS(0)) / k;
+    const aC = (yC - OY) / 100, bC = (xS(OY + 915) - OX) / 100;
     const bF = -1.7;                                                     // Werkstatt steht 1,7 m weiter zur Straße vor
     const roofPts = [[0, bF], [3.05, bF], [3.05, 0], [aC, 0], [9.15, bC], [9.15, bW], [0, bW]];
     F.slab(roofPts, GN, fl, conc, { walk: true, shadow: false });
@@ -2651,7 +2657,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
     F.wallL('b', bF + 0.25, bW, 0.1, 0.1, fl, H);                                                    // Ostwand
     F.wallL('b', bF + 0.25, bW, 3.0, 0.1, fl, H, [{ f: -0.5, t: 1.5, s: fl + 1.05, e: fl + 1.95 }]);   // Westwand: Fenster zum Stellplatz
     F.wallL('a', 0.05, 3.05, bW - 0.05, 0.1, fl, H, [{ f: 1.0, t: 1.9, s: fl, e: fl + 2.05 }]);      // Rückwand bündig mit der Holzwand, Tür in den Hof
-    doorLeaf({ axis: 'z', t: OX + (bW - 0.05) * 100, a: -325 + 100, b: -325 + 190, base: fl, top: fl + 2.05, hinge: 'a', swing: [-1, 0], kind: 'wood', group: V });
+    doorLeaf({ axis: 'z', t: OX + (bW - 0.05) * 100, a: OY + 100, b: OY + 190, base: fl, top: fl + 2.05, hinge: 'a', swing: [-1, 0], kind: 'wood', group: V });
     workbench(F, 0.35, 2.3, bF + 0.35, 1, true);
     [0.55, 0.95, 1.35].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 2.6, fl + 0.01, Math.PI / 2));
     F.put(makeMower(), 2.45, 5.0, fl, 0);
@@ -2660,7 +2666,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
     const wT = fl + 2.05;
     F.wallL('a', 3.05, 5.55, bW, 0.1, fl, wT); F.wallL('a', 6.55, 9.1, bW, 0.1, fl, wT);
     [5.52, 6.55].forEach(a => F.lb(a, a + 0.03, bW - 0.06, bW + 0.06, fl, wT, anth));              // Zarge
-    doorLeaf({ axis: 'z', t: OX + bW * 100, a: -325 + 555, b: -325 + 655, base: fl, top: wT, hinge: 'a', swing: [1, 0], kind: 'wood', group: V });   // Holztür, schwenkt in den Hof
+    doorLeaf({ axis: 'z', t: OX + bW * 100, a: OY + 555, b: OY + 655, base: fl, top: wT, hinge: 'a', swing: [1, 0], kind: 'wood', group: V });   // Holztür, schwenkt in den Hof
     F.lb(3.05, 9.1, bW - 0.06, bW + 0.06, wT, wT + 0.05, anth);                                     // Glasband: Rahmen unten …
     F.lb(3.05, 9.1, bW - 0.01, bW + 0.01, wT + 0.05, H - 0.02, glassM, { shadow: false }).renderOrder = 2;
     [3.1, 4.6, 6.05, 7.55, 9.05].forEach(a => F.lb(a - 0.03, a + 0.03, bW - 0.05, bW + 0.05, wT, H, anth));
@@ -2670,9 +2676,9 @@ const carport = { variants: [null], cars: null, roofs: [] };
     F.lb(aWw - 0.05, aWw + 0.05, dB0, dB1, top, H, boardMat(1));
     F.lb(aWw - 0.06, aWw + 0.06, dB0 - 0.03, dB0, STRIP, top, anth); F.lb(aWw - 0.06, aWw + 0.06, dB1, dB1 + 0.03, STRIP, top, anth);
     F.lb(aWw - 0.06, aWw + 0.06, dB0 - 0.03, dB1 + 0.03, top, top + 0.03, anth);
-    doorLeaf({ axis: 'x', t: -325 + aWw * 100, a: OX + dB0 * 100, b: OX + dB1 * 100, base: STRIP, top, hinge: 'a', swing: [0, -1], kind: 'wood', group: V });
+    doorLeaf({ axis: 'x', t: OY + aWw * 100, a: OX + dB0 * 100, b: OX + dB1 * 100, base: STRIP, top, hinge: 'a', swing: [0, -1], kind: 'wood', group: V });
     // Glasdach über dem Hof: auf Holzwand, Westwand und Hauswand, leicht geneigt; Rahmen anthrazit, keine Sprossen
-    const aG = 4.92;                                                     // Glasdach endet am WC-Fenster (Plan-y 167)
+    const aG = (167 - OY) / 100;                                         // Glasdach endet am WC-Fenster (Plan-y 167)
     const gl = F.slab([[aG, bW], [9.15, bW], [9.15, bH], [aG, bH]], H + 0.08, H + 0.1, tGlass, { roof: true, shadow: false }); gl.renderOrder = 2;
     F.lb(aG, 9.15, bH - 0.06, bH, H + 0.02, H + 0.14, anth, { roof: true });                       // Wandprofil am Haus
     F.lb(9.05, 9.2, bW, bH, H + 0.0, H + 0.14, anth, { roof: true });                                // Rinne an der Westwand
@@ -2680,8 +2686,11 @@ const carport = { variants: [null], cars: null, roofs: [] };
     F.lb(aG, aG + 0.06, bW, bH, H + 0.02, H + 0.14, anth, { roof: true });                           // Randprofil Ost
     F.lb(9.2, 9.28, bH - 0.3, bH - 0.22, GN, H + 0.1, anth);                                         // Fallrohr außen an der Westwand
     woodStair(V);
+    // Wärmepumpe außen vor der Westwand, 1,2 m westlich und 1,3 m weiter zur Straße: Weg aus der Tür bleibt frei
+    heatPump(120, V, -130);
+    box(-300, -235, 770, 895, GN, STRIP, M('#bdb9b1', { roughness: 0.95 }), V, { walk: true });   // kleines Fundament
     hailApron(F, 3.05, aC, 0.02, H);
-    V.userData.carSpots = [[F, 4.75, 3.05, 'oct'], [F, 7.55, 3.37, 'p208']];
+    V.userData.carSpots = [[F, 4.75, 3.05, 'oct'], [F, 7.4, 3.47, 'p208']];   // 208 etwas näher an Wand und Oct: Westecke bleibt unterm Dach
     V.userData.noShelter = true;                                                 // Fahrradunterstand in dieser Ansicht aus
     carport.variants.push(V);
   }
@@ -2964,7 +2973,7 @@ const cpTexts = [
   '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
   '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
   '<b>Wie Var. 3, Westseite bis ans Haus zu:</b> Eine gerade Wand quer zum Haus (hinter dem Technikfenster) läuft direkt bis an die Westwand der Werkstatt – keine Innenecke. Darin die Holztür, 1,5 m neben der Stiege, zum Betonweg Richtung Wärmepumpe und Garten. Nach Osten offen. Statt des schrägen Gangdachs ein Glasdach in der Hausflucht: an der Hauswand, auf der neuen Wand und an der Carport-Pfette aufgehängt, ohne Stütze, Rinne an der Hausecke. Darunter Beton wie im Carport. Neue Holzstiege: Podest 1,1 × 1,5 m knapp unter der Schwelle, rundum drei gleichmäßige Stufen, von allen Seiten begehbar. Glasdach ohne Sprossen.',
-  '<b>Wie Var. 1a, mit Eingangshof:</b> Flachdach in der Hausflucht, 9,2 × 7,5 m, länger zur Straße hin. Vor den Autos eine Holzwand mit Holztür zwischen den Stellplätzen und einem Glasband oben – aus der Haustür sieht man Holz und Licht statt der Autos (ein offener Durchlass läge genau in der Blickachse der Haustür). Dahinter ein Hof mit Glasdach und der neuen Holzstiege (Podest, rundum drei Stufen). Werkstatt 3 × 7 m jetzt im Osten, bündig mit der Holzwand und 1,7 m weiter zur Straße vor; Tür in den Hof, Fenster zur Straße und zum Stellplatz (3 Räder, Mäher, Werkbank, Regal). Das Glasdach reicht nur bis zum WC-Fenster, östlich davon ist der Hof offen. Das ganze Carport sitzt 30 cm näher am Haus als zuerst. Westseite bis ans Haus geschlossen, Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Einfahrt ohne Steher (Stahlträger von der Werkstatt bis zur Westwand), Westecke zur Straße abgeschrägt (≥ 1 m), Dachkante 2 m von der Grenze zu 1004/4.',
+  '<b>Wie Var. 1a, mit Eingangshof:</b> Flachdach in der Hausflucht, 9,2 × 7,5 m, länger zur Straße hin. Vor den Autos eine Holzwand mit Holztür zwischen den Stellplätzen und einem Glasband oben – aus der Haustür sieht man Holz und Licht statt der Autos (ein offener Durchlass läge genau in der Blickachse der Haustür). Dahinter ein Hof mit Glasdach und der neuen Holzstiege (Podest, rundum drei Stufen). Werkstatt 3 × 7 m jetzt im Osten, bündig mit der Holzwand und 1,7 m weiter zur Straße vor; Tür in den Hof, Fenster zur Straße und zum Stellplatz (3 Räder, Mäher, Werkbank, Regal). Das Glasdach reicht nur bis zum WC-Fenster, östlich davon ist der Hof offen. Das ganze Carport sitzt 30 cm näher am Haus als zuerst und ist 1,75 m nach Westen gerückt: Westwand bündig mit der Hauskante. Westseite bis ans Haus geschlossen, Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Einfahrt ohne Steher (Stahlträger von der Werkstatt bis zur Westwand), Westecke zur Straße abgeschrägt (0,9 m), Dachkante 3,8 m von der Grenze zu 1004/4. Wärmepumpe außen vor die Westwand versetzt (1,2 m nach Westen, 1,3 m zur Straße, eigenes kleines Fundament): Ventilator weiter zur Straße, nicht im Hof unter Glas, Weg aus der Tür in den Garten bleibt frei. Leitungen ca. 2,5 m länger.',
 ];
 const cpBtns = document.querySelectorAll('[data-cp]');
 function showCarport(v) {
