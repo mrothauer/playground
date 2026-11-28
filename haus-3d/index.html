@@ -60,7 +60,7 @@
   button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .jumps { display: flex; flex-wrap: wrap; gap: 6px; }
   .jumps .btn { background: var(--chip); padding: 8px 10px; font-size: 12.5px; }
-  .seg.seg4 { grid-template-columns: repeat(5, 1fr); }
+  .seg.seg4 { grid-template-columns: repeat(6, 1fr); }
   .toggles .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
   #cpInfo b { color: var(--fg); font-weight: 600; }
   .collapse { justify-self: end; margin-top: -6px; }
@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 27.11.2026, 17:10</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 09:55</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -135,7 +135,8 @@
     <div class="eyebrow">Carport-Planung</div>
     <div class="seg seg4" role="group" aria-label="Carport-Variante">
       <button data-cp="0" aria-pressed="true">Ist</button>
-      <button data-cp="1" aria-pressed="false">Var. 1</button>
+      <button data-cp="1" aria-pressed="false">Var. 1a</button>
+      <button data-cp="5" aria-pressed="false">Var. 1b</button>
       <button data-cp="2" aria-pressed="false">Var. 2</button>
       <button data-cp="3" aria-pressed="false">Var. 3</button>
       <button data-cp="4" aria-pressed="false">Var. 4</button>
@@ -2436,7 +2437,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
   const roofSlab = (F, pts, h = 2.30) => { F.slab(pts, h + 0.02, h + 0.25, anth, { roof: true }); F.slab(pts, h, h + 0.02, soffit, { roof: true }); };
   const makeGroup = () => { const g = new THREE.Group(); g.userData.toggle = true; g.visible = false; groups.site.add(g); return g; };
 
-  /* ===== Variante 1: Anbau am Haus, Flachdach in der Hausflucht =====
+  /* ===== Variante 1a: Anbau am Haus, Flachdach in der Hausflucht =====
      a entlang Plan +y (Westen) ab y −60, b entlang Plan +x (zum Haus) ab x −609.
      Stellplätze a 0–3 / 3–6, Abstellraum a 6–9,2 × b 0,9–3 (Westen, rechteckig, 0,9 m zurückversetzt,
      damit ca. 1 m Abstand zur Straße bleibt). Vor der Wärmepumpe bleibt 1,5 m frei, der Betonweg
@@ -2496,6 +2497,25 @@ const carport = { variants: [null], cars: null, roofs: [] };
      Abstand Dachkante – Grenze zu 1004/4 ≥ 2 m (Oö. BauTG § 40 Z 2), deshalb beginnt es erst bei s 9,7 m. */
   const s3 = 970;
 
+  /* Holzstiege mit Podest (Var. 4 und 1b): Podest 1,1 × 1,54 m knapp unter der Schwelle, rundum drei gleiche
+     Stufen (15,5 cm hoch, 25 cm Auftritt), von allen Seiten begehbar. Ersetzt die alte Stiege. */
+  const deck = (() => {
+    const c = document.createElement('canvas'); c.width = 64; c.height = 16; const k = c.getContext('2d');
+    k.fillStyle = '#a77d52'; k.fillRect(0, 0, 64, 16); k.fillStyle = 'rgba(255,255,255,0.07)'; k.fillRect(0, 0, 20, 16);
+    k.fillStyle = '#4a3624'; k.fillRect(61, 0, 3, 16); return c; })();
+  const deckMat = (wx, wy) => { const t = new THREE.CanvasTexture(deck); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wx / 14.5, Math.max(1, wy / 100)); return M('#ffffff', { map: t, roughness: 0.85 }); };
+  const woodStair = V => {
+    const step = (x0, x1, y0, y1, h) => box(x0, x1, y0, y1, GN, h, deckMat(x1 - x0, y1 - y0), V, { walk: true });
+    step(-169, -9, 186, 440, -0.33);
+    step(-144, -9, 211, 415, -0.175);
+    step(-119, -9, 236, 390, -0.02);                                           // Podest knapp unter der Schwelle
+  };
+  carport.onSwitch = v => {
+    const on = v === 4 || v === 5;                                             // Var. 4 und 1b mit neuer Stiege
+    entry.old.visible = !on;
+    if (on) { entry.cat.position.set(X(-131), -0.175, Z(222)); entry.cat.rotation.y = Math.PI + 0.6; }
+    else { entry.cat.position.set(X(-52), STRIP + 0.15, Z(360)); entry.cat.rotation.y = Math.PI - 0.3; }
+  };
   /* ===== Variante 4 = Variante 3 + geschlossene Westseite bis ans Haus und neuer Eingang =====
      Die Wand mit der Tür steht quer zum Haus (westlich hinter dem Technikfenster, 1,5 m Abstand zur Stiege)
      und läuft gerade bis an die Westwand der Werkstatt – keine Innenecke, außen nur eine Ecke.
@@ -2560,23 +2580,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
     box(d0 - 3, d0, yS - 11, yS + 1, STRIP, top, anth, V); box(d1, d1 + 3, yS - 11, yS + 1, STRIP, top, anth, V);   // Zarge
     box(d0 - 3, d1 + 3, yS - 11, yS + 1, top, top + 0.03, anth, V);
     doorLeaf({ axis: 'x', t: yS - 5, a: d0, b: d1, base: STRIP, top, hinge: 'a', swing: [0, -1], kind: 'wood', group: V });
-    // Holzstiege mit Podest
-    const deck = (() => {
-      const c = document.createElement('canvas'); c.width = 64; c.height = 16; const k = c.getContext('2d');
-      k.fillStyle = '#a77d52'; k.fillRect(0, 0, 64, 16); k.fillStyle = 'rgba(255,255,255,0.07)'; k.fillRect(0, 0, 20, 16);
-      k.fillStyle = '#4a3624'; k.fillRect(61, 0, 3, 16); return c; })();
-    const deckMat = (wx, wy) => { const t = new THREE.CanvasTexture(deck); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wx / 14.5, Math.max(1, wy / 100)); return M('#ffffff', { map: t, roughness: 0.85 }); };
-    const step = (x0, x1, y0, y1, h) => box(x0, x1, y0, y1, GN, h, deckMat(x1 - x0, y1 - y0), V, { walk: true });
-    // drei gleichmäßige Ringe um das Podest, je 25 cm Auftritt, symmetrisch zur Haustür
-    step(-169, -9, 186, 440, -0.33);
-    step(-144, -9, 211, 415, -0.175);
-    step(-119, -9, 236, 390, -0.02);                                           // Podest knapp unter der Schwelle
-    carport.onSwitch = v => {
-      const on = v === 4;
-      entry.old.visible = !on;
-      if (on) { entry.cat.position.set(X(-131), -0.175, Z(222)); entry.cat.rotation.y = Math.PI + 0.6; }
-      else { entry.cat.position.set(X(-52), STRIP + 0.15, Z(360)); entry.cat.rotation.y = Math.PI - 0.3; }
-    };
+    woodStair(V);
   };
   const buildPult = v4 => {
     const V = makeGroup(), F = frame(R0[0] + u[0] * s3, R0[1] + u[1] * s3, u[0], u[1], V);
@@ -2619,6 +2623,66 @@ const carport = { variants: [null], cars: null, roofs: [] };
   };
   buildPult(false);
   buildPult(true);
+
+  /* ===== Variante 1b: wie Var. 1 (Flachdach in der Hausflucht), aber mit Eingangshof =====
+     Rahmen: a entlang Plan +y (Westen) ab y −325, b entlang Plan +x (zum Haus) ab x −870.
+     Werkstatt im Osten (a 0,05–3,05 × b 0,25–7,4, also x −845 … −130), reicht bis knapp vor den
+     Fahrradunterstand; Dachkante y −325 → 2 m zur Grenze 1004/4. Stellplätze a 3,05–6,05 und 6,05–9,05.
+     Vor den Autos eine Holzwand (x −300) mit Holztür zwischen den Autos, darüber ein Glasband –
+     die Autos stehen nicht mehr direkt vor der Haustür. Zwischen Wand und Haus ein Eingangshof:
+     Glasdach, im Osten die Werkstatt (Tür in den Hof), im Westen eine Holzwand mit Tür auf dem Betonweg
+     zur Wärmepumpe, in der Mitte die neue Holzstiege. Westecke zur Straße abgeschrägt (≥ 1 m Abstand). */
+  {
+    const V = makeGroup(), F = frame(-870, -325, 0, 1, V);
+    const fl = GN + 0.03, H = 2.30, bW = 5.7, bH = 8.61;               // bW: Holzwand vor dem Hof, bH: Hauswand (x −9)
+    const aC = 8.15, bC = 0.93;                                          // Abschrägung an der Straße (a 8,15 / b 0 → a 9,15 / b 0,93)
+    const roofPts = [[0, 0], [aC, 0], [9.15, bC], [9.15, bW], [3.05, bW], [3.05, 7.45], [0, 7.45]];
+    F.slab(roofPts, GN, fl, conc, { walk: true, shadow: false });
+    F.slab([[3.05, bW], [9.15, bW], [9.15, bH], [3.05, bH]], GN, fl, conc, { walk: true, shadow: false });   // Hof
+    roofSlab(F, roofPts, H);
+    // Träger vorne über der Einfahrt, stützenfrei von der Werkstatt bis zur Westecke
+    F.lb(0, aC, 0.0, 0.14, 2.06, H, anth);
+    F.post(aC - 0.06, 0.08, H);
+    {
+      const L = Math.hypot(9.15 - aC, bC), m = addMesh(new THREE.BoxGeometry(L, H - 2.06, 0.14), anth, F.g);
+      m.position.set((aC + 9.15) / 2, (2.06 + H) / 2, -(bC / 2)); m.rotation.y = Math.atan2(bC, 9.15 - aC);
+    }
+    // Werkstatt (3 × 7 m): Fenster zur Straße, Tür in den Hof
+    F.wallL('a', 0.05, 3.05, 0.3, 0.1, fl, H, [{ f: 0.6, t: 2.4, s: fl + 1.05, e: fl + 1.95 }]);      // Front zur Straße
+    F.wallL('b', 0.25, 7.4, 0.1, 0.1, fl, H);                                                        // Ostwand
+    F.wallL('b', 0.25, 7.4, 3.0, 0.1, fl, H, [{ f: 1.2, t: 3.2, s: fl + 1.05, e: fl + 1.95 }, { f: 6.35, t: 7.25, s: fl, e: fl + 2.05 }]);   // Westwand: Fenster zum Stellplatz, Tür in den Hof
+    F.wallL('a', 0.05, 3.05, 7.35, 0.1, fl, H);                                                      // Rückwand
+    doorLeaf({ axis: 'x', t: -20, a: -235, b: -145, base: fl, top: fl + 2.05, hinge: 'b', swing: [0, -1], kind: 'wood', group: V });
+    workbench(F, 0.35, 2.3, 0.35, 1, true);
+    [0.55, 0.95, 1.35].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 4.3, fl + 0.01, Math.PI / 2));
+    F.put(makeMower(), 2.45, 6.7, fl, 0);
+    shelf(F, 2.4, 2.9, 3.6, 5.6);
+    // Holzwand vor dem Hof mit Tür zwischen den Autos (a 5,55–6,55), oben ein Glasband
+    const wT = fl + 2.05;
+    F.wallL('a', 3.05, 5.55, bW, 0.1, fl, wT); F.wallL('a', 6.55, 9.1, bW, 0.1, fl, wT);
+    [5.52, 6.55].forEach(a => F.lb(a, a + 0.03, bW - 0.06, bW + 0.06, fl, wT, anth));              // Zarge
+    doorLeaf({ axis: 'z', t: -870 + bW * 100, a: -325 + 555, b: -325 + 655, base: fl, top: wT, hinge: 'a', swing: [1, 0], kind: 'wood', group: V });   // Holztür, schwenkt in den Hof
+    F.lb(3.05, 9.1, bW - 0.06, bW + 0.06, wT, wT + 0.05, anth);                                     // Glasband: Rahmen unten …
+    F.lb(3.05, 9.1, bW - 0.01, bW + 0.01, wT + 0.05, H - 0.02, glassM, { shadow: false }).renderOrder = 2;
+    [3.1, 4.6, 6.05, 7.55, 9.05].forEach(a => F.lb(a - 0.03, a + 0.03, bW - 0.05, bW + 0.05, wT, H, anth));
+    // Westwand (Wetterseite) von der Abschrägung bis ans Haus, Tür auf dem Betonweg neben der Wärmepumpe
+    const aWw = 9.1, dB0 = 7.6, dB1 = 8.45, top = STRIP + 2.05;
+    F.wallL('b', bC + 0.05, dB0, aWw, 0.1, fl, H); F.wallL('b', dB1, bH, aWw, 0.1, fl, H);
+    F.lb(aWw - 0.05, aWw + 0.05, dB0, dB1, top, H, boardMat(1));
+    F.lb(aWw - 0.06, aWw + 0.06, dB0 - 0.03, dB0, STRIP, top, anth); F.lb(aWw - 0.06, aWw + 0.06, dB1, dB1 + 0.03, STRIP, top, anth);
+    F.lb(aWw - 0.06, aWw + 0.06, dB0 - 0.03, dB1 + 0.03, top, top + 0.03, anth);
+    doorLeaf({ axis: 'x', t: -325 + aWw * 100, a: -870 + dB0 * 100, b: -870 + dB1 * 100, base: STRIP, top, hinge: 'a', swing: [0, -1], kind: 'wood', group: V });
+    // Glasdach über dem Hof: auf Holzwand, Westwand und Hauswand, leicht geneigt; Rahmen anthrazit, keine Sprossen
+    const gl = F.slab([[3.05, bW], [9.15, bW], [9.15, bH], [3.05, bH]], H + 0.08, H + 0.1, tGlass, { roof: true, shadow: false }); gl.renderOrder = 2;
+    F.lb(3.05, 9.15, bH - 0.06, bH, H + 0.02, H + 0.14, anth, { roof: true });                       // Wandprofil am Haus
+    F.lb(9.05, 9.2, bW, bH, H + 0.0, H + 0.14, anth, { roof: true });                                // Rinne an der Westwand
+    F.lb(3.05, 9.15, bW, bW + 0.06, H + 0.02, H + 0.14, anth, { roof: true });                       // auf der Holzwand
+    F.lb(9.2, 9.28, bH - 0.3, bH - 0.22, GN, H + 0.1, anth);                                         // Fallrohr außen an der Westwand
+    woodStair(V);
+    hailApron(F, 3.05, aC, 0.02, H);
+    V.userData.carSpots = [[F, 4.75, 3.05, 'oct'], [F, 7.55, 3.37, 'p208']];
+    carport.variants.push(V);
+  }
   // Ohne Carport (Ist): Autos auf dem Schotter vor dem Haus, gleich wie bei Variante 1
   {
     const g = new THREE.Group(); groups.site.add(g);
@@ -2898,6 +2962,7 @@ const cpTexts = [
   '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
   '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
   '<b>Wie Var. 3, Westseite bis ans Haus zu:</b> Eine gerade Wand quer zum Haus (hinter dem Technikfenster) läuft direkt bis an die Westwand der Werkstatt – keine Innenecke. Darin die Holztür, 1,5 m neben der Stiege, zum Betonweg Richtung Wärmepumpe und Garten. Nach Osten offen. Statt des schrägen Gangdachs ein Glasdach in der Hausflucht: an der Hauswand, auf der neuen Wand und an der Carport-Pfette aufgehängt, ohne Stütze, Rinne an der Hausecke. Darunter Beton wie im Carport. Neue Holzstiege: Podest 1,1 × 1,5 m knapp unter der Schwelle, rundum drei gleichmäßige Stufen, von allen Seiten begehbar. Glasdach ohne Sprossen.',
+  '<b>Wie Var. 1a, mit Eingangshof:</b> Flachdach in der Hausflucht, 9,2 × 7,5 m, länger zur Straße hin. Vor den Autos eine Holzwand mit Holztür zwischen den Stellplätzen und einem Glasband oben – aus der Haustür sieht man Holz und Licht statt der Autos (ein offener Durchlass läge genau in der Blickachse der Haustür). Dahinter ein Hof mit Glasdach und der neuen Holzstiege (Podest, rundum drei Stufen). Werkstatt 3 × 7 m jetzt im Osten, mit Tür in den Hof und Fenstern zur Straße und zum Stellplatz (3 Räder, Mäher, Werkbank, Regal). Westseite bis ans Haus geschlossen, Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Stützenfrei über der Einfahrt, Westecke zur Straße abgeschrägt (≥ 1 m), Dachkante 2 m von der Grenze zu 1004/4.',
 ];
 const cpBtns = document.querySelectorAll('[data-cp]');
 function showCarport(v) {
