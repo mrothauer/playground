@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:50</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:55</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -1212,8 +1212,8 @@ function kiesBox(x0, x1, y0, y1, h0, h1) {
   return box(x0, x1, y0, y1, h0, h1, M('#ffffff', { map: t, roughness: 1 }), groups.site, { walk: true, shadow: false });
 }
 // schmaler Streifen mit 25 cm Schotterfuge zur Hauswand
-entry.strip = box(-159, -34, 240, 656, -0.65, STRIP, concrete, groups.site, { walk: true });   // schmaler Betonstreifen bis zur Wärmepumpe (Var. 1b: weg)
-box(-159, -34, 656, 916, -0.65, STRIP, concrete, groups.site, { walk: true });
+entry.strip = box(-159, -34, 240, 440, -0.65, STRIP, concrete, groups.site, { walk: true });   // Teil unter der Stiege: bei der neuen Stiege weg, sonst schaut er über die unterste Stufe
+box(-159, -34, 440, 916, -0.65, STRIP, concrete, groups.site, { walk: true });
 box(-34, 617, 791, 916, -0.65, STRIP, concrete, groups.site, { walk: true });
 kiesBox(-34, -9, 240, 791, -0.65, STRIP - 0.03);
 kiesBox(-9, 617, 766, 791, -0.65, STRIP - 0.03);
@@ -2578,7 +2578,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
   const deckMat = (wx, wy) => { const t = new THREE.CanvasTexture(deck); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(wx / 14.5, Math.max(1, wy / 100)); return M('#ffffff', { map: t, roughness: 0.85 }); };
   const woodStair = V => {
     const step = (x0, x1, y0, y1, h) => box(x0, x1, y0, y1, GN, h, deckMat(x1 - x0, y1 - y0), V, { walk: true });
-    step(-169, -9, 186, 440, -0.33);
+    step(-169, -9, 186, 440, -0.32);                                           // knapp über Kies (−0,33)
     step(-144, -9, 211, 415, -0.175);
     step(-119, -9, 236, 390, -0.02);                                           // Podest knapp unter der Schwelle
     box(-9, 7.5, 258, 368, -0.035, 0.002, deckMat(16.5, 110), V, { walk: true });   // Holz in der Laibung bis an die Haustür
@@ -2586,7 +2586,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
   carport.onSwitch = v => {
     const on = v === 4 || v === 5;                                             // Var. 4 und 1b mit neuer Stiege
     entry.old.visible = !on;
-    entry.strip.visible = v !== 5;                                             // Var. 1b: Hof mit Plattenbelag statt Betonstreifen
+    entry.strip.visible = !on;
     if (on) { entry.cat.position.set(X(-131), -0.175, Z(222)); entry.cat.rotation.y = Math.PI + 0.6; }
     else { entry.cat.position.set(X(-52), STRIP + 0.15, Z(360)); entry.cat.rotation.y = Math.PI - 0.3; }
   };
