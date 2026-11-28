@@ -8,8 +8,8 @@
   :root {
     --bg: #dfe7ee;
     --panel: rgba(255, 255, 255, 0.3);
-    --fg: #1f2a33;
-    --muted: #5d6b76;
+    --fg: #0b1218;
+    --muted: #26323b;
     --line: rgba(31, 42, 51, 0.14);
     --accent: #8a5a2b;
     --accent-fg: #ffffff;
@@ -20,13 +20,13 @@
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #1a2128; --panel: rgba(24, 31, 38, 0.3); --fg: #e8edf1; --muted: #9fb0bd;
+      --bg: #1a2128; --panel: rgba(24, 31, 38, 0.3); --fg: #ffffff; --muted: #dfe7ed;
       --line: rgba(232, 237, 241, 0.14); --accent: #d49a5e; --accent-fg: #1a1208; --chip: #26313b;
       --label-bg: rgba(24, 31, 38, 0.92); color-scheme: dark;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #1a2128; --panel: rgba(24, 31, 38, 0.3); --fg: #e8edf1; --muted: #9fb0bd;
+    --bg: #1a2128; --panel: rgba(24, 31, 38, 0.3); --fg: #ffffff; --muted: #dfe7ed;
     --line: rgba(232, 237, 241, 0.14); --accent: #d49a5e; --accent-fg: #1a1208; --chip: #26313b;
     --label-bg: rgba(24, 31, 38, 0.92); color-scheme: dark;
   }
@@ -64,7 +64,7 @@
   .toggles .btn[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
   #cpInfo b { color: var(--fg); font-weight: 600; }
   .collapse { justify-self: end; margin-top: -6px; }
-  #toggle { position: absolute; top: 10px; right: 10px; background: none; border: 0; color: var(--muted); font-size: 18px; cursor: pointer; padding: 4px 8px; }
+  #toggle { position: absolute; top: 10px; right: 10px; background: none; border: 0; color: var(--fg); font-size: 20px; font-weight: 600; cursor: pointer; padding: 4px 8px; }
   .panel.min > :not(h1):not(#toggle) { display: none; }
   .hud {
     position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:05</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:15</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -2629,7 +2629,7 @@ const carport = { variants: [null], cars: null, roofs: [] };
 
   /* ===== Variante 1b: wie Var. 1 (Flachdach in der Hausflucht), aber mit Eingangshof =====
      Rahmen: a entlang Plan +y (Westen) ab y −149, b entlang Plan +x (zum Haus) ab x −840.
-     Werkstatt im Osten (a 0,05–3,05 × b −1,45–5,7, also x −985 … −270), bündig mit der Holzwand; Dachkante y −149 → 3,8 m zur Grenze 1004/4. Stellplätze a 3,05–6,05 und 6,05–9,05.
+     Werkstatt im Osten (a 0,05–3,05 × b −1,45–5,7, also x −1035 … −270, 3,5 × 7,6 m), bündig mit der Holzwand; Dachkante y −149 → 3,8 m zur Grenze 1004/4. Stellplätze a 3,05–6,05 und 6,05–9,05.
      Vor den Autos eine Holzwand (x −270) mit Holztür zwischen den Autos, darüber ein Glasband –
      die Autos stehen nicht mehr direkt vor der Haustür. Zwischen Wand und Haus ein Eingangshof:
      Glasdach, im Osten die Werkstatt (Tür in den Hof), im Westen eine Holzwand mit Tür auf dem Betonweg
@@ -2640,8 +2640,8 @@ const carport = { variants: [null], cars: null, roofs: [] };
     // Abschrägung an der Straße: 0,9 m Abstand zur Grundgrenze (Linie parallel zur Straße)
     const dS = 90, xS = y => onD(dS, y)[0], k = xS(1) - xS(0), yC = (OX - xS(0)) / k;
     const aC = (yC - OY) / 100, bC = (xS(OY + 925) - OX) / 100;
-    const bF = -1.7;                                                     // Werkstatt steht 1,7 m weiter zur Straße vor
-    const roofPts = [[0, bF], [3.05, bF], [3.05, 0], [aC, 0], [9.25, bC], [9.25, bW], [0, bW]];
+    const bF = -2.2, aE = -0.5;                                          // Werkstatt: 2,2 m weiter zur Straße vor, 0,5 m breiter nach Osten
+    const roofPts = [[aE, bF], [3.05, bF], [3.05, 0], [aC, 0], [9.25, bC], [9.25, bW], [aE, bW]];
     F.slab(roofPts, GN, fl, conc, { walk: true, shadow: false });
     F.slab([[0, bW], [9.25, bW], [9.25, bH], [0, bH]], GN, fl, conc, { walk: true, shadow: false });   // Hof
     roofSlab(F, roofPts, H);
@@ -2652,12 +2652,12 @@ const carport = { variants: [null], cars: null, roofs: [] };
       m.position.set((aC + 9.25) / 2, (2.0 + H) / 2, -(bC / 2)); m.rotation.y = Math.atan2(bC, 9.25 - aC);
     }
     // Werkstatt (3 × 7 m): Fenster zur Straße, Tür in den Hof
-    F.wallL('a', 0.05, 3.05, bF + 0.3, 0.1, fl, H, [{ f: 0.6, t: 2.4, s: fl + 1.05, e: fl + 1.95 }]);   // Front zur Straße
-    F.wallL('b', bF + 0.25, bW, 0.1, 0.1, fl, H);                                                    // Ostwand
-    F.wallL('b', bF + 0.25, bW, 3.0, 0.1, fl, H, [{ f: -0.5, t: 1.5, s: fl + 1.05, e: fl + 1.95 }]);   // Westwand: Fenster zum Stellplatz
-    F.wallL('a', 0.05, 3.05, bW - 0.05, 0.1, fl, H, [{ f: 1.0, t: 1.9, s: fl, e: fl + 2.05 }]);      // Rückwand bündig mit der Holzwand, Tür in den Hof
+    F.wallL('a', aE + 0.05, 3.05, bF + 0.3, 0.1, fl, H, [{ f: 0.1, t: 2.4, s: fl + 1.05, e: fl + 1.95 }]);   // Front zur Straße
+    F.wallL('b', bF + 0.25, bW, aE + 0.1, 0.1, fl, H);                                                    // Ostwand
+    F.wallL('b', bF + 0.25, bW, 3.0, 0.1, fl, H, [{ f: -1.0, t: 1.5, s: fl + 1.05, e: fl + 1.95 }]);   // Westwand: Fenster zum Stellplatz
+    F.wallL('a', aE + 0.05, 3.05, bW - 0.05, 0.1, fl, H, [{ f: 1.0, t: 1.9, s: fl, e: fl + 2.05 }]);      // Rückwand bündig mit der Holzwand, Tür in den Hof
     doorLeaf({ axis: 'z', t: OX + (bW - 0.05) * 100, a: OY + 100, b: OY + 190, base: fl, top: fl + 2.05, hinge: 'a', swing: [-1, 0], kind: 'wood', group: V });
-    workbench(F, 0.35, 2.3, bF + 0.35, 1, true);
+    workbench(F, -0.15, 2.8, bF + 0.35, 1, true);
     [0.55, 0.95, 1.35].forEach((a, i) => F.put(makeBike(bikeCols[i]), a, 2.6, fl + 0.01, Math.PI / 2));
     F.put(makeMower(), 2.45, 5.0, fl, 0);
     shelf(F, 2.4, 2.9, 1.9, 3.9);
@@ -2976,7 +2976,7 @@ const cpTexts = [
   '<b>Parallel zur Straße, Flachdach:</b> 8,2 × 6 m, nur 1 m hinter der Grundgrenze. Raum 2,2 × 6 m an der Westseite für 4 Räder und Mäher. Vom Stellplatz unter dem Dach zum überdachten Gang bis zur Haustür. Der Betonweg an der Wärmepumpe vorbei bleibt frei. Wenig Schneeräumen, Schwemmholzzaun bleibt.',
   '<b>Pultdach mit Werkstatt:</b> 8,8 × 6 m, 1 m hinter der Grundgrenze, Stehfalzblech anthrazit, 7°, hoch an der geschlossenen Westseite, stützenfrei zwischen den Autos (Pfetten 16/36 cm). Schnee rutscht nach Osten ab, nicht vor die Einfahrt. Werkstatt 3 × 6 m mit Werkbank unterm Fenster, 3 Räder, Mäher, Regal. Überdachter Gang zur Haustür, Betonweg zum Garten bleibt frei. Dachkante 2,1 m von der Grenze zu 1004/4.',
   '<b>Wie Var. 3, Westseite bis ans Haus zu:</b> Eine gerade Wand quer zum Haus (hinter dem Technikfenster) läuft direkt bis an die Westwand der Werkstatt – keine Innenecke. Darin die Holztür, 1,5 m neben der Stiege, zum Betonweg Richtung Wärmepumpe und Garten. Nach Osten offen. Statt des schrägen Gangdachs ein Glasdach in der Hausflucht: an der Hauswand, auf der neuen Wand und an der Carport-Pfette aufgehängt, ohne Stütze, Rinne an der Hausecke. Darunter Beton wie im Carport. Neue Holzstiege: Podest 1,1 × 1,5 m knapp unter der Schwelle, rundum drei gleichmäßige Stufen, von allen Seiten begehbar. Glasdach ohne Sprossen.',
-  '<b>Wie Var. 1a, mit Eingangshof:</b> Flachdach in der Hausflucht, 9,2 × 7,5 m, länger zur Straße hin. Vor den Autos eine Holzwand mit Holztür zwischen den Stellplätzen und einem Glasband oben – aus der Haustür sieht man Holz und Licht statt der Autos (ein offener Durchlass läge genau in der Blickachse der Haustür). Dahinter ein Hof mit Glasdach und der neuen Holzstiege (Podest, rundum drei Stufen). Werkstatt 3 × 7 m jetzt im Osten, bündig mit der Holzwand und 1,7 m weiter zur Straße vor; Tür in den Hof, Fenster zur Straße und zum Stellplatz (3 Räder, Mäher, Werkbank, Regal). Das Glasdach reicht nur bis zum WC-Fenster, östlich davon ist der Hof offen. Das ganze Carport sitzt 30 cm näher am Haus als zuerst und ist 1,75 m nach Westen gerückt: Westwand bündig mit der Hauskante. Westseite bis ans Haus geschlossen, Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Einfahrt ohne Steher (Stahlträger von der Werkstatt bis zur Westwand), Westecke zur Straße abgeschrägt (0,9 m), Dachkante 3,8 m von der Grenze zu 1004/4. Die Wärmepumpe bleibt, wo sie ist (im Hof neben der Gartentür). Dach entwässert über eine Rinne an der Westwand direkt ins bestehende Fallrohr an der Hausecke.',
+  '<b>Wie Var. 1a, mit Eingangshof:</b> Flachdach in der Hausflucht, 9,2 × 7,5 m, länger zur Straße hin. Vor den Autos eine Holzwand mit Holztür zwischen den Stellplätzen und einem Glasband oben – aus der Haustür sieht man Holz und Licht statt der Autos (ein offener Durchlass läge genau in der Blickachse der Haustür). Dahinter ein Hof mit Glasdach und der neuen Holzstiege (Podest, rundum drei Stufen). Werkstatt 3,5 × 7,6 m jetzt im Osten, bündig mit der Holzwand und 2,2 m weiter zur Straße vor; Tür in den Hof, Fenster zur Straße und zum Stellplatz (3 Räder, Mäher, Werkbank, Regal). Das Glasdach reicht nur bis zum WC-Fenster, östlich davon ist der Hof offen. Das ganze Carport sitzt 30 cm näher am Haus als zuerst und ist 1,75 m nach Westen gerückt: Westwand bündig mit der Hauskante. Westseite bis ans Haus geschlossen, Holztür auf dem Betonweg zur Wärmepumpe und in den Garten. Einfahrt ohne Steher (Stahlträger von der Werkstatt bis zur Westwand), Westecke zur Straße abgeschrägt (0,9 m), Dachkante 3,8 m von der Grenze zu 1004/4. Die Wärmepumpe bleibt, wo sie ist (im Hof neben der Gartentür). Dach entwässert über eine Rinne an der Westwand direkt ins bestehende Fallrohr an der Hausecke.',
 ];
 const cpBtns = document.querySelectorAll('[data-cp]');
 function showCarport(v) {
@@ -3006,7 +3006,7 @@ document.getElementById('tLabels').addEventListener('click', e => {
   e.currentTarget.setAttribute('aria-pressed', String(showSiteLabels));
   if (!walking) siteLabels.forEach(l => l.visible = showSiteLabels);
 });
-showCarport(4);                                    // Startansicht: Variante 4 mit Autos und Fahrradunterstand
+showCarport(5);                                    // Startansicht: Variante 1b mit Autos
 carport.cars.visible = true; document.getElementById('tCars').setAttribute('aria-pressed', 'true');
 document.querySelectorAll('[data-jump]').forEach(b => b.addEventListener('click', () => jump(b.dataset.jump)));
 document.getElementById('toggle').addEventListener('click', e => {
