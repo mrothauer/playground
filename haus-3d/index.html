@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:45</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:55</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -750,7 +750,7 @@ const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
 
 /* Zweiter Schwemmholzzaun vorne beim Nordost-Spitz: beginnt in der Ecke am Zaun des Nachbarn (1004/4),
    läuft ca. 4 m entlang der Grundgrenze zur Straße (Pflastersteine), wie der andere Schwemmholzzaun
-   1,45 m vom Asphalt der Straße entfernt, knickt dann ab und läuft ca. 7 m parallel zum Nachbarzaun Richtung Haus.
+   1,45 m vom Asphalt der Straße entfernt, knickt dann ab und läuft parallel zum Nachbarzaun Richtung Haus bis in die Flucht der Werkstatt-Vorderwand (x −1035).
    Die Lattung sitzt an der langen Seite innen (zum Nachbarzaun hin). */
 {
   const C = [508, 378];                                   // Hausmitte, zeigt ins Grundstück
@@ -760,7 +760,7 @@ const driftGeo = new THREE.CylinderGeometry(0.92, 1.08, 1, 16, 1);
   const nbY = -490 + SITE_SHIFT_Y;                        // Flucht des Nachbarzauns (Plan-y)
   // Start: Schnitt der um 50 cm nach innen versetzten Grenzlinie mit dem Nachbarzaun
   const ox = T[0] + nx * 95, oy = T[1] + ny * 95, s0 = (nbY - oy) / dy;   // 1,45 m bis zum Asphalt der Straße
-  const S = [ox + dx * s0, oy + dy * s0], E = [S[0] + dx * 400, S[1] + dy * 400], F = [E[0] + 700, E[1]];
+  const S = [ox + dx * s0, oy + dy * s0], E = [S[0] + dx * 400, S[1] + dy * 400], F = [-1035, E[1]];   // endet bündig mit der Vorderwand der Werkstatt (Var. 1b)
   const path = [S, E, F], pts = [];
   for (let i = 0; i < path.length - 1; i++) {
     const a = path[i], b = path[i + 1], L = Math.hypot(b[0] - a[0], b[1] - a[1]);
@@ -2728,6 +2728,23 @@ const carport = { variants: [null], cars: null, roofs: [] };
     hailApron(F, 3.05, aC, 0.02, H);
     V.userData.carSpots = [[F, 4.75, 3.05, 'oct'], [F, 7.4, 3.47, 'p208']];   // 208 etwas näher an Wand und Oct: Westecke bleibt unterm Dach
     V.userData.noShelter = true;
+    // Türchen zwischen Schwemmholzzaun (endet bei x −1035, y ≈ −277) und Werkstatt-Ostwand: Rahmen aus Holz,
+    // senkrechte runde Schwemmholz-Äste wie der Zaun, ca. 1 m hoch, Angel an der Werkstatt
+    {
+      const gx = -1035, y0 = -268, y1 = OY + (aE + 0.05) * 100, gw = M('#8f7556', { roughness: 0.85 }), g0 = gAt(gx);
+      box(gx - 4, gx + 4, y0 - 8, y0, g0, g0 + 1.05, gw, V, { collide: true });                    // Anschlagsteher am Zaun
+      box(gx - 4, gx + 4, y1 - 4, y1, g0, g0 + 1.05, gw, V);                                       // Angelleiste an der Werkstatt
+      for (const hh of [0.2, 0.85]) box(gx - 2, gx + 2, y0 + 2, y1 - 6, g0 + hh, g0 + hh + 0.07, gw, V);   // Querriegel
+      box(gx - 2, gx + 2, y0 + 2, y1 - 6, g0 + 0.15, g0 + 1.0, gw, V, { collide: true }).visible = false;
+      const cols = ['#b9b2a6', '#a39a8d', '#cdc6b9', '#958c80'];
+      let k = 0;
+      for (let y = y0 + 6; y < y1 - 8; y += 9 + (k % 3) * 1.5) {
+        const r = 0.025 + (k * 37 % 5) * 0.006, h = 0.92 + (k * 53 % 7) * 0.025;
+        const c = addMesh(driftGeo, M(cols[k % 4], { roughness: 0.95 }), V);
+        c.scale.set(r, h, r); c.position.set(X(gx + 4 + r * 100), g0 + h / 2, Z(y)); c.rotation.y = k * 1.3; k++;
+      }
+      box(gx + 4, gx + 7, y0 + 6, y0 + 14, g0 + 0.95, g0 + 0.98, M('#2b2e31'), V);                // Riegel/Griff
+    }
     // Flächen für die Beschriftung in den Ansichten EG/OG offen (lichte Maße innen)
     {
       const poly = pts => Math.abs(pts.reduce((t, [x, y], k) => { const [u, w] = pts[(k + 1) % pts.length]; return t + x * w - u * y; }, 0)) / 2;
