@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 11:55</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:05</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -2753,7 +2753,9 @@ const carport = { variants: [null], cars: null, roofs: [] };
       const work = (2.95 - (aE + 0.15)) * ((bW - 0.1) - (bF + 0.35));
       const cars = poly([[3.05, 0], [aC, 0], [aI, bCi], [aI, bW - 0.1], [3.05, bW - 0.1]]);
       const glass = (aI - aG) * (bH - (bW + 0.05));
-      V.userData.areaLabels = [['Werkstatt', fmt(work), F.P(1.3, 1.6)], ['Stellplätze', fmt(cars), F.P(6.05, 0.9)], ['Glas-Vorraum', fmt(glass), F.P(7.3, 7.0)]];
+      const wW = 2.95 - (aE + 0.15), wL = (bW - 0.1) - (bF + 0.35);
+      V.userData.areaLabels = [['Werkstatt', fmt(work), F.P(1.3, 1.6), [wW, wL]], ['Stellplätze', fmt(cars), F.P(6.05, 0.9), [aI - 3.05, bW - 0.1, true]],
+        ['Glas-Vorraum', fmt(glass), F.P(7.3, 7.0), [aI - aG, bH - (bW + 0.05)]]];
     }                                                 // Fahrradunterstand in dieser Ansicht aus
     carport.variants.push(V);
   }
@@ -2908,14 +2910,20 @@ const rooms = [
   { floor: 'og', name: 'Kinderzimmer Ost', area: '15,61 m²', r: [455, 988, 436, 728] },
 ];
 const labels = { eg: [], og: [] };
+// Breite × Länge (kurze Seite zuerst); ca. = grob (abgeschrägt oder L-förmig), dann eine Nachkommastelle
+const dimTxt = (w, l, ca = false) => { const [p, q] = [w, l].sort((m, n) => m - n), f = v => v.toFixed(ca ? 1 : 2).replace('.', ',');
+  return `${ca ? 'ca. ' : ''}${f(p)} × ${f(q)} m`; };
 rooms.forEach(rm => {
   if (!rm.area && rm.name !== 'Küche / Essen') return;
   if (rm.name === 'Stiege' && rm.floor === 'og') return;
   const el = document.createElement('div');
   el.className = 'label';
-  el.innerHTML = `${rm.name}${rm.area ? `<span>${rm.area}</span>` : ''}`;
-  const o = new CSS2DObject(el);
   const [x0, x1, y0, y1] = rm.r;
+  const all = [rm.r, ...(rm.extra || [])];                       // Außenmaße über alle Teilflächen
+  const bw = Math.max(...all.map(q => q[1])) - Math.min(...all.map(q => q[0])), bl = Math.max(...all.map(q => q[3])) - Math.min(...all.map(q => q[2]));
+  const dims = /m²/.test(rm.area) && rm.name !== 'Wohnen' ? `<span>${dimTxt(bw / 100, bl / 100, !!rm.extra)}</span>` : '';
+  el.innerHTML = `${rm.name}${rm.area ? `<span>${rm.area}</span>` : ''}${dims}`;
+  const o = new CSS2DObject(el);
   o.position.set(X((x0 + x1) / 2), rm.floor === 'eg' ? 1.0 : 3.96, Z((y0 + y1) / 2));
   o.visible = false;
   scene.add(o);
@@ -2924,14 +2932,14 @@ rooms.forEach(rm => {
 
 // Carport-Flächen (nur Varianten mit areaLabels, in EG/OG offen)
 labels.cp = [];
-carport.variants.forEach((V, i) => (V && V.userData.areaLabels || []).forEach(([name, area, [px, py]]) => {
-  const el = document.createElement('div'); el.className = 'label'; el.innerHTML = `${name}<span>${area}</span>`;
+carport.variants.forEach((V, i) => (V && V.userData.areaLabels || []).forEach(([name, area, [px, py], dims]) => {
+  const el = document.createElement('div'); el.className = 'label'; el.innerHTML = `${name}<span>${area}</span><span>${dimTxt(...dims)}</span>`;
   const o = new CSS2DObject(el); o.position.set(X(px), 0.6, Z(py)); o.visible = false; o.userData.variant = i;
   scene.add(o); labels.cp.push(o);
 }));
 {
   const el = document.createElement('div'); el.className = 'label';
-  el.innerHTML = `Container<span>${((1026 - 400 - 8) * (330 - 39 - 8) / 1e4).toFixed(1).replace('.', ',')} m²</span>`;
+  el.innerHTML = `Container<span>${((1026 - 400 - 8) * (330 - 39 - 8) / 1e4).toFixed(1).replace('.', ',')} m²</span><span>${dimTxt(6.18, 2.83)}</span>`;
   const o = new CSS2DObject(el); o.position.set(X(713), 1.0, Z(-185)); o.visible = false; o.userData.variant = -1;
   scene.add(o); labels.cp.push(o);
 }
