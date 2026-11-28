@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:30</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 12:40</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -2711,7 +2711,15 @@ const carport = { variants: [null], cars: null, roofs: [] };
     const bF = -2.2, aE = (driftFence.eastY - 7 - OY - 5) / 100;       // Werkstatt: 2,2 m weiter zur Straße vor, Ostwand außen bündig mit dem Schwemmholzzaun
     const roofPts = [[aE, bF], [3.05, bF], [3.05, 0], [aC, 0], [9.25, bC], [9.25, bW], [aE, bW]];
     F.slab(roofPts, GN, fl, conc, { walk: true, shadow: false });
-    F.slab([[0, bW], [9.25, bW], [9.25, bH], [0, bH]], GN, fl, conc, { walk: true, shadow: false });   // Hof
+    // Hof: Plattenbelag 40 × 40 cm in wärmerem Grau, damit sich der bestehende Betonstreifen (schmale Terrasse) abhebt
+    const paveMat = (() => {
+      const c = document.createElement('canvas'); c.width = c.height = 128; const k = c.getContext('2d');
+      k.fillStyle = '#6f6a62'; k.fillRect(0, 0, 128, 128);
+      [[0, 0], [64, 0], [0, 64], [64, 64]].forEach(([x, y], i) => { k.fillStyle = ['#a39d92', '#9a948a', '#a8a297', '#9e988d'][i]; k.fillRect(x + 2, y + 2, 60, 60); });
+      const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1 / 0.8, 1 / 0.8); t.anisotropy = 4;
+      return M('#ffffff', { map: t, roughness: 0.9 });
+    })();
+    F.slab([[0, bW], [9.25, bW], [9.25, bH], [0, bH]], GN, fl, paveMat, { walk: true, shadow: false });   // Hof
     roofSlab(F, roofPts, H);
     // Stahlträger vorne über der Einfahrt, ohne Steher: von der Werkstatt bis zur Westwand (über die Abschrägung)
     F.lb(3.05, aC, 0.0, 0.14, 2.0, H, anth);
