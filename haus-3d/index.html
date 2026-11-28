@@ -116,7 +116,7 @@
 <div id="stage"></div>
 
 <section class="panel min" id="panel">
-  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 10:50</small></h1>
+  <h1>Unser Wolfhaus in 3D <small id="stand" style="font: 400 11px var(--font-ui); color: var(--muted); display: block; margin-top: 2px;">Stand 28.11.2026, 10:55</small></h1>
   <button id="toggle" aria-label="Panel ausklappen">+</button>
   <div id="orbitUi">
     <div class="eyebrow">Ansicht</div>
@@ -2870,9 +2870,7 @@ function setView(v) {
   ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).setAttribute('aria-pressed', String(k === v)));
 }
 ['aussen', 'og', 'eg'].forEach(k => document.getElementById('v-' + k).addEventListener('click', () => {
-  setView(k);
-  if (k !== 'aussen') { camera.position.set(3, 15.5, 10.5); controls.target.set(0, k === 'og' ? 3 : 0.3, 0.6); }
-  else homeView();
+  setView(k);                                         // nur umschalten: Ausschnitt und Zoom bleiben
 }));
 
 /* ---------- Rundgang ---------- */
